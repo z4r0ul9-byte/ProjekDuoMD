@@ -20,6 +20,8 @@
             surface: '#ffffff',
             'surface-alt': '#fafafa',
             border: '#e5e5e5',
+            success: '#22c55e',
+            error: '#ef4444',
           }
         }
       }
@@ -38,11 +40,7 @@
 
     // --- STORAGE ---
     const DEFAULT_SETTINGS = {
-      apiKey: '',
-      targetLanguage: 'English',
-      stylePreset: 'santuy',
-      customStylePrompt: '',
-      level: 'beginner',
+      apiKey: '', targetLanguage: 'English', stylePreset: 'santuy', customStylePrompt: '', level: 'beginner',
     };
 
     const loadSettings = () => {
@@ -51,15 +49,19 @@
         return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
       } catch { return DEFAULT_SETTINGS; }
     };
-
-    const saveSettings = (settings) => {
-      localStorage.setItem('linguaquest.settings', JSON.stringify(settings));
-    };
+    const saveSettings = (settings) => localStorage.setItem('linguaquest.settings', JSON.stringify(settings));
 
     // --- ICONS ---
     const Sparkles = ({ size = 24 }) => (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+      </svg>
+    );
+    const SpeakerIcon = () => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
       </svg>
     );
 
@@ -74,37 +76,55 @@
 
     const generatePrompt = (settings) => {
       return `Kamu adalah guru bahasa ${settings.targetLanguage} untuk orang Indonesia.
-Buatkan 5 soal latihan (campuran translate, fill-in-the-blank, dan grammar) untuk level ${settings.level}.
+Buatkan 5 soal latihan untuk level ${settings.level}. Wajib campur dari 4 tipe ini:
+1. "grammar" (pilihan ganda, isi field "options" array 4 string)
+2. "translate" (terjemahkan kalimat)
+3. "fill-blank" (isi titik-titik, soal ada di field "question")
+4. "listening" (pilihan ganda, isi field "audioText" dengan teks yang akan dibacakan TTS, dan "options")
+
 Gaya bahasa kamu saat memberikan penjelasan harus: ${getStyleText(settings)}.
 
 Output HARUS berupa JSON array murni tanpa markdown, dengan format persis seperti ini:
 [
   {
+    "type": "grammar",
+    "question": "Which one is correct?",
+    "options": ["He go to school", "He goes to school", "He going to school", "He gone to school"],
+    "correctAnswer": "He goes to school",
+    "explanation": "Penjelasan singkat..."
+  },
+  {
     "type": "translate",
     "question": "Saya suka makan apel",
     "prompt": "Translate to ${settings.targetLanguage}",
     "correctAnswer": "I like eating apples",
-    "explanation": "Penjelasan kenapa jawabannya itu..."
+    "explanation": "Penjelasan..."
+  },
+  {
+    "type": "fill-blank",
+    "question": "I ___ a student",
+    "prompt": "Isi dengan kata yang tepat",
+    "correctAnswer": "am",
+    "explanation": "Penjelasan..."
+  },
+  {
+    "type": "listening",
+    "audioText": "Hello, how are you?",
+    "options": ["Hello, how are you?", "Good morning", "Thank you", "See you later"],
+    "correctAnswer": "Hello, how are you?",
+    "explanation": "Penjelasan..."
   }
 ]`;
     };
 
-    // --- GEMINI API FETCH WITH RETRY & FALLBACK ---
-    // Mengutamakan model yang lebih stabil, bukan yang terbaru.
-    const FALLBACK_MODELS = [
-      'gemini-3.6-flash',    // Paling stabil untuk free tier
-      'gemini-3.1-flash-lite', // Alternatif ringan jika 3.6 penuh
-      'gemini-3.8-flash'     // Model terbaru (paling sering 503)
-    ];
-
+    // --- GEMINI API FETCH ---
+    const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     const fetchWithFallback = async (prompt, apiKey) => {
       let lastError = null;
-
       for (const model of FALLBACK_MODELS) {
-        // Coba maksimal 3 kali untuk setiap model dengan jeda (exponential backoff)
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
               method: 'POST',
@@ -114,111 +134,61 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
                 generationConfig: { responseMimeType: "application/json" }
               })
             });
-
             if (res.ok) {
               const json = await res.json();
-              const rawText = json.candidates[0].content.parts[0].text;
-              return JSON.parse(rawText); // Sukses
-            } 
-            
+              return JSON.parse(json.candidates[0].content.parts[0].text);
+            }
             const errData = await res.json();
-            const errorMsg = errData.error?.message || "";
-            
-            // Jika error 503 (High Demand) atau 429 (Rate Limit), tunggu lalu coba lagi
             if (res.status === 503 || res.status === 429) {
-              lastError = new Error(`Model ${model} sibuk (${res.status}).`);
-              // Jeda: 2 detik, lalu 4 detik
-              await sleep(attempt * 2000); 
-              continue; // Lanjut ke percobaan berikutnya
-            } 
-            
-            // Jika error lain (misal 400/403), langsung lempar error
-            throw new Error(errorMsg || `Gagal dengan status ${res.status}`);
-
+              lastError = new Error(`Model ${model} sibuk.`);
+              await sleep(attempt * 2000); continue;
+            }
+            throw new Error(errData.error?.message || "Gagal");
           } catch (err) {
             lastError = err;
-            // Jika ini error jaringan, tunggu sebentar sebelum mencoba model berikutnya
-            if (attempt === 3) break; 
+            if (attempt === 2) break;
             await sleep(1000);
           }
         }
-        // Jika 3 percobaan untuk model ini gagal, lanjut ke model berikutnya di daftar
-        console.warn(`Model ${model} gagal setelah 3 percobaan. Beralih ke model berikutnya.`);
       }
-      
-      throw new Error(`Semua model sedang sibuk atau tidak tersedia. Error terakhir: ${lastError?.message}`);
+      throw new Error(`Semua server sibuk: ${lastError?.message}`);
     };
 
     // --- COMPONENTS ---
     function Onboarding({ onSave }) {
       const [form, setForm] = useState(loadSettings());
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        saveSettings(form);
-        onSave();
-      };
+      const handleSubmit = (e) => { e.preventDefault(); saveSettings(form); onSave(); };
 
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="lq-fade-in max-w-md w-full bg-surface rounded-2xl border border-border shadow-sm p-6 sm:p-8">
+          <div className="lq-fade-in max-w-md w-full bg-surface rounded-2xl border border-border shadow-sm p-6">
             <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-accent-soft text-accent mb-3">
-                <Sparkles size={24} />
-              </div>
-              <h1 className="text-2xl font-bold text-ink">Selamat Datang</h1>
-              <p className="text-sm text-ink-muted mt-1">Atur preferensi belajarmu dulu</p>
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-accent-soft text-accent mb-3"><Sparkles size={24} /></div>
+              <h1 className="text-2xl font-bold text-ink">Pengaturan</h1>
             </div>
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-ink mb-1">Gemini API Key</label>
-                <input type="password" required placeholder="AIzaSy..." value={form.apiKey} onChange={e => setForm({...form, apiKey: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-sm" />
-                <p className="text-xs text-ink-muted mt-1">Dapetin gratis di aistudio.google.com</p>
+                <input type="password" required value={form.apiKey} onChange={e => setForm({...form, apiKey: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent" />
               </div>
-              
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Bahasa Target</label>
-                  <select value={form.targetLanguage} onChange={e => setForm({...form, targetLanguage: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent">
-                    <option>English</option>
-                    <option>Japanese</option>
-                    <option>Korean</option>
-                    <option>Arabic</option>
-                    <option>Spanish</option>
+                  <label className="block text-sm font-medium text-ink mb-1">Bahasa</label>
+                  <select value={form.targetLanguage} onChange={e => setForm({...form, targetLanguage: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm">
+                    <option>English</option><option>Japanese</option><option>Korean</option><option>Arabic</option><option>Spanish</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Level</label>
-                  <select value={form.level} onChange={e => setForm({...form, level: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent">
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
+                  <label className="block text-sm font-medium text-ink mb-1">Gaya</label>
+                  <select value={form.stylePreset} onChange={e => setForm({...form, stylePreset: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm">
+                    <option value="santuy">Santuy</option><option value="gaul">Gaul</option><option value="formal">Formal</option><option value="custom">Custom</option>
                   </select>
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1">Gaya Mengajar AI</label>
-                <select value={form.stylePreset} onChange={e => setForm({...form, stylePreset: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-accent">
-                  <option value="santuy">Santuy & Asik</option>
-                  <option value="gaul">Gaul Jakarta (Slang)</option>
-                  <option value="formal">Formal & Baku</option>
-                  <option value="storyteller">Storyteller (Bercerita)</option>
-                  <option value="custom">Custom...</option>
-                </select>
-              </div>
-
               {form.stylePreset === 'custom' && (
-                <div>
-                  <label className="block text-sm font-medium text-ink mb-1">Custom Gaya</label>
-                  <input type="text" placeholder="Misal: Bikin penjelasannya pake pantun" value={form.customStylePrompt} onChange={e => setForm({...form, customStylePrompt: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
-                </div>
+                <input type="text" placeholder="Gaya custom..." value={form.customStylePrompt} onChange={e => setForm({...form, customStylePrompt: e.target.value})} className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
               )}
-
-              <button type="submit" className="w-full bg-accent hover:bg-blue-600 text-white font-medium py-2.5 rounded-lg transition-colors mt-2">
-                Simpan & Mulai
-              </button>
+              <button type="submit" className="w-full bg-accent text-white font-medium py-2.5 rounded-lg mt-2">Simpan</button>
             </form>
           </div>
         </div>
@@ -230,66 +200,191 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
         <div className="min-h-screen flex items-center justify-center p-4">
           <div className="lq-fade-in max-w-md w-full bg-surface rounded-2xl border border-border shadow-sm p-8 text-center">
             <h1 className="text-2xl font-bold text-ink mb-2">Siap Belajar?</h1>
-            <p className="text-ink-muted mb-6 text-sm">Bahasa: <span className="font-semibold text-ink">{settings.targetLanguage}</span> • Gaya: <span className="font-semibold text-ink capitalize">{settings.stylePreset}</span></p>
-            
-            <button onClick={onStart} className="w-full bg-accent hover:bg-blue-600 text-white font-medium py-3 rounded-xl transition-colors mb-3 shadow-sm">
-              Mulai Latihan
-            </button>
-            <button onClick={onSettings} className="text-sm text-ink-muted hover:text-ink">Ubah Pengaturan</button>
+            <p className="text-ink-muted mb-6 text-sm">{settings.targetLanguage} • {settings.stylePreset}</p>
+            <button onClick={onStart} className="w-full bg-accent text-white font-medium py-3 rounded-xl mb-3">Mulai Latihan</button>
+            <button onClick={onSettings} className="text-sm text-ink-muted">Ubah Pengaturan</button>
           </div>
         </div>
       );
     }
 
+    // --- LESSON (KUIS UI) ---
     function Lesson({ settings, onBack }) {
       const [loading, setLoading] = useState(false);
       const [error, setError] = useState('');
-      const [data, setData] = useState(null);
+      const [exercises, setExercises] = useState([]);
+      const [currentIndex, setCurrentIndex] = useState(0);
+      
+      // State buat jawaban user
+      const [typedAnswer, setTypedAnswer] = useState('');
+      const [selectedOption, setSelectedOption] = useState(null);
+      const [isAnswered, setIsAnswered] = useState(false);
+      const [isCorrect, setIsCorrect] = useState(false);
 
       const fetchExercises = async () => {
-        setLoading(true);
-        setError('');
+        setLoading(true); setError('');
         try {
           const prompt = generatePrompt(settings);
           const result = await fetchWithFallback(prompt, settings.apiKey);
-          setData(result);
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
+          setExercises(result);
+          setCurrentIndex(0);
+        } catch (err) { setError(err.message); } 
+        finally { setLoading(false); }
+      };
+
+      const playAudio = (text) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = settings.targetLanguage === 'English' ? 'en-US' : 'ja-JP'; // fallback aja
+          window.speechSynthesis.speak(utterance);
+        } else {
+          alert("Browser lu ga support TTS (Text-to-Speech)");
         }
       };
 
-      return (
-        <div className="min-h-screen p-4 pt-8 bg-surface-alt">
-          <div className="max-w-2xl mx-auto">
-            <button onClick={onBack} className="text-sm text-ink-muted mb-4 inline-block">&larr; Kembali</button>
-            
-            <div className="bg-surface rounded-2xl border border-border p-6 shadow-sm min-h-[300px]">
-              <h2 className="text-lg font-bold mb-4">Phase 2: Uji Gemini</h2>
+      const handleCheck = () => {
+        const currentQ = exercises[currentIndex];
+        let userAns = currentQ.options ? selectedOption : typedAnswer;
+        
+        if (!userAns) return; // Jangan submit kalau kosong
+
+        const isMatch = userAns.trim().toLowerCase() === currentQ.correctAnswer.trim().toLowerCase();
+        setIsCorrect(isMatch);
+        setIsAnswered(true);
+      };
+
+      const handleNext = () => {
+        if (currentIndex < exercises.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+          setTypedAnswer(''); setSelectedOption(null); setIsAnswered(false); setIsCorrect(false);
+        } else {
+          // Kalau udah soal terakhir, balik ke Home
+          alert("Mantap! Latihan selesai.");
+          onBack();
+        }
+      };
+
+      // --- RENDER SOAL BERDASARKAN TIPE ---
+      const renderExercise = () => {
+        const q = exercises[currentIndex];
+        
+        // Header (Progress bar)
+        const progress = ((currentIndex) / exercises.length) * 100;
+
+        return (
+          <div className="w-full max-w-lg mx-auto">
+            {/* Progress Bar */}
+            <div className="w-full bg-border rounded-full h-2 mb-6">
+              <div className="bg-accent h-2 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
+            </div>
+
+            <div className="mb-8">
+              <p className="text-sm font-bold text-accent mb-2 uppercase tracking-wide">{q.type.replace('-', ' ')}</p>
               
-              {!data && !loading && (
-                <button onClick={fetchExercises} className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-medium">
-                  Generate 5 Soal Sekarang
+              {/* Teks Soal */}
+              {q.type === 'listening' ? (
+                <button onClick={() => playAudio(q.audioText)} className="w-20 h-20 bg-accent text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg hover:bg-blue-600">
+                  <SpeakerIcon />
                 </button>
+              ) : (
+                <h2 className="text-xl sm:text-2xl font-bold text-ink leading-tight">
+                  {q.question}
+                </h2>
               )}
-
-              {loading && <p className="text-accent animate-pulse text-sm">Menghubungi Gemini... (Mencari server yang siap & mencoba ulang jika sibuk)</p>}
               
-              {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-200">
-                  <strong>Error:</strong> {error}
-                  <br/><br/>
-                  Jika masih gagal, berarti semua server Google memang sedang penuh. Tunggu 1-2 menit lalu coba lagi.
-                </div>
-              )}
+              {q.prompt && <p className="text-ink-muted mt-2 text-sm">{q.prompt}</p>}
+            </div>
 
-              {data && (
-                <div className="bg-black text-green-400 p-4 rounded-xl text-xs overflow-auto max-h-96">
-                  <pre>{JSON.stringify(data, null, 2)}</pre>
-                </div>
+            {/* Input Area */}
+            <div className="space-y-3">
+              {/* Jika ada opsi (MCQ) */}
+              {q.options && q.options.map((opt, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => !isAnswered && setSelectedOption(opt)}
+                  disabled={isAnswered}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all font-medium ${
+                    isAnswered && opt === q.correctAnswer ? 'border-success bg-green-50 text-success' :
+                    isAnswered && opt === selectedOption && !isCorrect ? 'border-error bg-red-50 text-error' :
+                    selectedOption === opt ? 'border-accent bg-accent-soft text-accent' : 
+                    'border-border bg-white text-ink hover:bg-surface-alt'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+
+              {/* Jika Tipe Translate / Fill Blank (Input Teks) */}
+              {!q.options && (
+                <input 
+                  type="text" 
+                  value={typedAnswer} 
+                  onChange={e => setTypedAnswer(e.target.value)}
+                  disabled={isAnswered}
+                  placeholder="Ketik jawabanmu di sini..."
+                  className={`w-full px-4 py-3 rounded-xl border-2 text-lg outline-none transition-all ${
+                    isAnswered && isCorrect ? 'border-success bg-green-50' :
+                    isAnswered && !isCorrect ? 'border-error bg-red-50' :
+                    'border-border focus:border-accent'
+                  }`}
+                  onKeyDown={(e) => { if(e.key === 'Enter') handleCheck(); }}
+                />
               )}
             </div>
+
+            {/* Footer / Feedback */}
+            {isAnswered && (
+              <div className={`mt-6 p-4 rounded-xl border ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                <p className={`font-bold mb-1 ${isCorrect ? 'text-success' : 'text-error'}`}>
+                  {isCorrect ? '✅ Benar!' : '❌ Salah, jawaban yang bener:'}
+                </p>
+                {!isCorrect && <p className="font-medium mb-2">{q.correctAnswer}</p>}
+                <p className="text-sm text-ink-muted">{q.explanation}</p>
+              </div>
+            )}
+
+            {/* Tombol Action */}
+            <div className="mt-8">
+              {!isAnswered ? (
+                <button 
+                  onClick={handleCheck} 
+                  disabled={!typedAnswer && !selectedOption}
+                  className="w-full bg-accent text-white font-bold py-3.5 rounded-xl disabled:opacity-50"
+                >
+                  Cek Jawaban
+                </button>
+              ) : (
+                <button 
+                  onClick={handleNext} 
+                  className="w-full bg-accent text-white font-bold py-3.5 rounded-xl"
+                >
+                  {currentIndex === exercises.length - 1 ? 'Selesai' : 'Lanjut Soal Berikutnya'}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen p-4 pt-6 bg-surface-alt flex flex-col">
+          <button onClick={onBack} className="text-sm font-medium text-ink-muted mb-4 self-start">&larr; Keluar</button>
+          
+          <div className="flex-1 flex flex-col justify-center pb-12">
+            {!exercises.length && !loading && (
+              <div className="text-center">
+                <button onClick={fetchExercises} className="bg-accent text-white px-6 py-3 rounded-xl font-bold shadow-md">
+                  Generate 5 Soal Sekarang
+                </button>
+              </div>
+            )}
+
+            {loading && <p className="text-center font-medium text-accent animate-pulse">Menyiapkan soal dari AI...</p>}
+            
+            {error && <div className="text-center bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>}
+
+            {exercises.length > 0 && renderExercise()}
           </div>
         </div>
       );
@@ -306,10 +401,7 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
         setView(loaded.apiKey ? 'home' : 'onboarding');
       }, []);
 
-      const handleSaveSettings = () => {
-        setSettings(loadSettings());
-        setView('home');
-      };
+      const handleSaveSettings = () => { setSettings(loadSettings()); setView('home'); };
 
       if (view === 'loading') return null;
       if (view === 'onboarding') return <Onboarding onSave={handleSaveSettings} />;
