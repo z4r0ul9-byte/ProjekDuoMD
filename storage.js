@@ -21,3 +21,31 @@ const saveSettings = (settings) => {
     localStorage.setItem('linguaquest.settings', JSON.stringify(settings));
   } catch(e) {}
 };
+
+// --- PROGRESS (XP & STREAK) ---
+const DEFAULT_PROGRESS = {
+  xp: 0,
+  streak: 0,
+  lastPlayedDate: '',
+  todayXp: 0
+};
+
+const loadProgress = () => {
+  try {
+    const raw = localStorage.getItem('linguaquest.progress');
+    return raw ? { ...DEFAULT_PROGRESS, ...JSON.parse(raw) } : DEFAULT_PROGRESS;
+  } catch {
+    return DEFAULT_PROGRESS;
+  }
+};
+
+const saveProgress = (progress) => {
+  try {
+    localStorage.setItem('linguaquest.progress', JSON.stringify(progress));
+  } catch(e) {}
+};
+
+const getTodayString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
