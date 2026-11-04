@@ -53,7 +53,6 @@ const log = (msg, type = 'info') => {
   if (typeof window.addLog === 'function') window.addLog(msg, type);
 };
 
-// Helper buat bersihin JSON dari format markdown (```json ... ```)
 const cleanJSON = (text) => {
   let cleaned = text.trim();
   if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json/, '');
@@ -66,7 +65,6 @@ const fetchAI = async (prompt, settings) => {
   const { apiKey, provider, modelName, customBaseUrl } = settings;
 
   if (provider === 'gemini') {
-    // GEMINI FALLBACK LOGIC
     const FALLBACK_MODELS = [modelName || 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
     let lastError = null;
     for (const model of FALLBACK_MODELS) {
@@ -103,7 +101,6 @@ const fetchAI = async (prompt, settings) => {
     throw new Error(`Semua model Gemini gagal: ${lastError?.message}`);
   } 
   else {
-    // OPENAI COMPATIBLE (Ollama, Groq, OpenAI, OpenRouter, dll)
     try {
       log(`[Custom API] Mencoba ${modelName}...`, 'accent');
       const url = `${customBaseUrl.replace(/\/$/, '')}/chat/completions`;
@@ -112,12 +109,11 @@ const fetchAI = async (prompt, settings) => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey || 'ollama'}` // Ollama butuh string random
+          'Authorization': `Bearer ${apiKey || 'ollama'}` 
         },
         body: JSON.stringify({
           model: modelName,
           messages: [{ role: "user", content: prompt }],
-          // Paksa JSON kalau API-nya support (OpenAI/Groq biasanya support)
           response_format: { type: "json_object" } 
         })
       });
@@ -129,8 +125,6 @@ const fetchAI = async (prompt, settings) => {
 
       const json = await res.json();
       log(`[Custom API] Sukses!`, 'success');
-      
-      // Kadang API lokal ngasih response beda dikit
       const rawText = json.choices[0].message.content;
       return cleanJSON(rawText);
     } catch (err) {
