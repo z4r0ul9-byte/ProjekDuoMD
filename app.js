@@ -12,17 +12,19 @@ let state = {
   isCorrect: false,
   typedAnswer: '',
   selectedOption: null,
-  logs: [], // Tempat nyimpen log
-  showLogs: false // Status modal log
+  logs: [], 
+  showLogs: false,
+  // State buat Otodidak
+  customTopic: '',
+  isReviewMode: false
 };
 
 const appDiv = document.getElementById('app');
 
-// FUNGSI BUAT NAMBAHIN LOG DARI API.JS
 window.addLog = (msg, type = 'info') => {
   const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
   state.logs.push({ time, msg, type });
-  if (state.logs.length > 100) state.logs.shift(); // Max 100 log biar ga berat
+  if (state.logs.length > 100) state.logs.shift(); 
   if (state.showLogs) renderLogModal();
 };
 
@@ -32,7 +34,7 @@ function init() {
   if (state.settings.apiKey) state.view = 'home';
   else state.view = 'onboarding';
   
-  initFloatingLogBtn(); // Bikin tombol log melayang
+  if(!document.getElementById('floatingLogBtn')) initFloatingLogBtn(); 
   render();
 }
 
@@ -44,21 +46,7 @@ function render() {
   else if (state.view === 'summary') renderSummary();
 }
 
-function updateStreak() {
-  const today = getTodayString();
-  const lastPlayed = state.progress.lastPlayedDate;
-  if (lastPlayed !== today) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
-    if (lastPlayed === yesterdayStr) state.progress.streak += 1;
-    else state.progress.streak = 1;
-    state.progress.lastPlayedDate = today;
-  }
-  saveProgress(state.progress);
-}
-
-// --- UI LOG TERMINAL ---
+// --- LOG TERMINAL ---
 function initFloatingLogBtn() {
   const btn = document.createElement('button');
   btn.id = 'floatingLogBtn';
@@ -70,10 +58,7 @@ function initFloatingLogBtn() {
 
 function renderLogModal() {
   let modal = document.getElementById('logModal');
-  if (!state.showLogs) {
-    if (modal) modal.remove();
-    return;
-  }
+  if (!state.showLogs) { if (modal) modal.remove(); return; }
   
   if (!modal) {
     modal = document.createElement('div');
@@ -90,35 +75,38 @@ function renderLogModal() {
     if (l.type === 'accent') color = 'text-indigo-400';
     return `<div class="mb-1.5 leading-relaxed"><span class="text-slate-500">[${l.time}]</span> <span class="${color}">${l.msg}</span></div>`;
   }).join('');
-  
   if (state.logs.length === 0) logHtml = '<div class="text-slate-500 italic text-center mt-4">Belum ada aktivitas...</div>';
 
   modal.innerHTML = `
     <div class="bg-[#0d1117] rounded-2xl border border-slate-700 w-full max-w-lg mx-auto overflow-hidden shadow-2xl flex flex-col max-h-[70vh]">
       <div class="flex justify-between items-center px-4 py-3 bg-[#161b22] border-b border-slate-700">
-        <h3 class="text-white font-mono font-bold text-sm flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-          LinguaQuest Terminal
-        </h3>
+        <h3 class="text-white font-mono font-bold text-sm flex items-center gap-2">LinguaQuest Terminal</h3>
         <button id="btnCloseLog" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
       </div>
-      <div class="p-4 overflow-y-auto font-mono text-xs flex-1 custom-scrollbar">
-        ${logHtml}
-      </div>
-      <div class="bg-[#161b22] p-2 text-center border-t border-slate-700">
-        <p class="text-[10px] text-slate-500 font-mono">System Logs Real-time</p>
-      </div>
+      <div class="p-4 overflow-y-auto font-mono text-xs flex-1">${logHtml}</div>
     </div>
   `;
-  
   document.getElementById('btnCloseLog').onclick = () => { state.showLogs = false; renderLogModal(); };
 }
 
-// --- ONBOARDING / SETTINGS ---
+function updateStreak() {
+  const today = getTodayString();
+  const lastPlayed = state.progress.lastPlayedDate;
+  if (lastPlayed !== today) {
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+    if (lastPlayed === yesterdayStr) state.progress.streak += 1;
+    else state.progress.streak = 1;
+    state.progress.lastPlayedDate = today;
+  }
+  saveProgress(state.progress);
+}
+
+// --- ONBOARDING ---
 function renderOnboarding() {
   appDiv.innerHTML = `
-    <div class="flex-1 flex items-center justify-center p-4">
-      <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-8 mt-10">
+    <div class="flex-1 flex items-center justify-center p-4 pt-16">
+      <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-8">
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 text-accent rounded-2xl mb-4 shadow-inner-light">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
@@ -129,22 +117,21 @@ function renderOnboarding() {
         <form id="settingsForm" class="space-y-5">
           <div>
             <label class="block text-sm font-bold text-slate-700 mb-2">Gemini API Key</label>
-            <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent focus:bg-white transition-colors" placeholder="AIzaSy..." />
+            <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" />
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2">Bahasa Target</label>
-              <select id="targetLanguage" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent appearance-none cursor-pointer">
+              <label class="block text-sm font-bold text-slate-700 mb-2">Bahasa</label>
+              <select id="targetLanguage" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
                 <option ${state.settings.targetLanguage === 'English' ? 'selected' : ''}>English</option>
                 <option ${state.settings.targetLanguage === 'Japanese' ? 'selected' : ''}>Japanese</option>
                 <option ${state.settings.targetLanguage === 'Korean' ? 'selected' : ''}>Korean</option>
-                <option ${state.settings.targetLanguage === 'Arabic' ? 'selected' : ''}>Arabic</option>
                 <option ${state.settings.targetLanguage === 'Spanish' ? 'selected' : ''}>Spanish</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-bold text-slate-700 mb-2">Gaya</label>
-              <select id="stylePreset" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent appearance-none cursor-pointer">
+              <select id="stylePreset" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
                 <option value="santuy" ${state.settings.stylePreset === 'santuy' ? 'selected' : ''}>Santuy</option>
                 <option value="gaul" ${state.settings.stylePreset === 'gaul' ? 'selected' : ''}>Gaul</option>
                 <option value="formal" ${state.settings.stylePreset === 'formal' ? 'selected' : ''}>Formal</option>
@@ -153,11 +140,9 @@ function renderOnboarding() {
             </div>
           </div>
           <div id="customStyleContainer" class="${state.settings.stylePreset === 'custom' ? 'block' : 'hidden'}">
-            <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" />
+            <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-accent" />
           </div>
-          <button type="submit" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3.5 rounded-2xl mt-4">
-            Simpan & Lanjut
-          </button>
+          <button type="submit" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3.5 rounded-2xl mt-4">Simpan</button>
         </form>
       </div>
     </div>
@@ -184,53 +169,67 @@ function renderOnboarding() {
 // --- HOME SCREEN ---
 function renderHome() {
   if (state.progress.lastPlayedDate !== getTodayString()) state.progress.todayXp = 0;
+  const hasMistakes = state.progress.mistakes && state.progress.mistakes.length > 0;
   
   appDiv.innerHTML = `
     <div class="flex-1 flex flex-col p-5 max-w-md mx-auto w-full pb-8 pt-16">
-      <!-- Top Bar (Stats) -->
-      <div class="flex gap-4 mb-8">
-        <div class="flex-1 bg-white rounded-2xl p-4 shadow-premium border border-slate-100 flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 animate-pop">
-            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
-          </div>
-          <div>
-            <p class="text-xs text-slate-400 font-extrabold uppercase tracking-wider">Streak</p>
-            <p class="text-xl font-black text-slate-800 leading-none">${state.progress.streak} <span class="text-sm font-bold text-slate-500">Hari</span></p>
-          </div>
+      <div class="flex gap-3 mb-6">
+        <div class="flex-1 bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+          <svg width="20" height="20" class="text-orange-500 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
+          <p class="text-[10px] text-slate-400 font-extrabold uppercase">Streak</p>
+          <p class="text-lg font-black text-slate-800 leading-none">${state.progress.streak}</p>
         </div>
-        <div class="flex-1 bg-white rounded-2xl p-4 shadow-premium border border-slate-100 flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-500">
-            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          </div>
-          <div>
-            <p class="text-xs text-slate-400 font-extrabold uppercase tracking-wider">Total XP</p>
-            <p class="text-xl font-black text-slate-800 leading-none">${state.progress.xp}</p>
-          </div>
+        <div class="flex-1 bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+          <svg width="20" height="20" class="text-yellow-500 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <p class="text-[10px] text-slate-400 font-extrabold uppercase">Total XP</p>
+          <p class="text-lg font-black text-slate-800 leading-none">${state.progress.xp}</p>
         </div>
       </div>
 
-      <!-- Hero Section -->
-      <div class="flex-1 flex flex-col justify-center text-center items-center">
-        <div class="w-32 h-32 bg-indigo-50 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner-light rotate-3">
-           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="-rotate-3"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-        </div>
-        <h1 class="text-3xl font-black text-slate-800 mb-3 tracking-tight">Siap Taklukkan<br>${state.settings.targetLanguage}?</h1>
-        <p class="text-slate-500 font-medium mb-8 px-4">Latihan 5 soal tiap hari buat jaga streak kamu.</p>
-        
-        <button id="btnStart" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-xl py-4 rounded-2xl tracking-wide shadow-lg">
+      <!-- Topik Custom -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
+        <label class="block text-sm font-bold text-slate-700 mb-2">Mau belajar apa hari ini? (Opsional)</label>
+        <input type="text" id="topicInput" value="${state.customTopic}" placeholder="Misal: Makanan, Past Tense, atau Liburan..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent mb-3" />
+        <button id="btnStartCustom" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-lg py-3 rounded-xl">
           MULAI BELAJAR
         </button>
       </div>
 
-      <div class="text-center mt-6">
-        <button id="btnSettings" class="text-sm font-bold text-slate-400 hover:text-slate-700 transition-colors bg-slate-200/50 px-4 py-2 rounded-full">⚙️ Pengaturan</button>
+      <!-- Smart Review -->
+      ${hasMistakes ? `
+        <div class="bg-red-50 rounded-2xl p-4 shadow-sm border-2 border-red-100 mb-4 animate-slide-up">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="bg-red-200 text-red-600 p-2 rounded-lg"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
+            <div>
+              <h3 class="font-bold text-slate-800">Smart Review</h3>
+              <p class="text-xs text-slate-500">${state.progress.mistakes.length} kesalahan tercatat</p>
+            </div>
+          </div>
+          <button id="btnReview" class="w-full btn-3d bg-red-500 hover:bg-red-600 border-red-700 text-white font-black text-md py-2.5 rounded-xl">
+            PERBAIKI KESALAHAN
+          </button>
+        </div>
+      ` : ''}
+
+      <div class="text-center mt-auto pt-4">
+        <button id="btnSettings" class="text-sm font-bold text-slate-400 hover:text-slate-700">⚙️ Pengaturan</button>
       </div>
     </div>
   `;
 
-  document.getElementById('btnStart').addEventListener('click', () => {
+  document.getElementById('btnStartCustom').addEventListener('click', () => {
+    state.customTopic = document.getElementById('topicInput').value;
+    state.isReviewMode = false;
     state.view = 'lesson'; state.exercises = []; state.currentIndex = 0; state.correctCount = 0; state.error = ''; render();
   });
+
+  if(hasMistakes) {
+    document.getElementById('btnReview').addEventListener('click', () => {
+      state.isReviewMode = true;
+      state.view = 'lesson'; state.exercises = []; state.currentIndex = 0; state.correctCount = 0; state.error = ''; render();
+    });
+  }
+
   document.getElementById('btnSettings').addEventListener('click', () => { state.view = 'settings'; render(); });
 }
 
@@ -238,10 +237,12 @@ function renderHome() {
 function renderLesson() {
   appDiv.innerHTML = `
     <div class="flex-1 flex flex-col p-5 pt-16 min-h-screen max-w-lg mx-auto w-full">
-      <div class="flex items-center mb-4">
+      <div class="flex items-center justify-between mb-4">
         <button id="btnBack" class="text-slate-400 hover:text-slate-700 p-2 -ml-2 rounded-full bg-slate-200/50">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </button>
+        ${state.isReviewMode ? `<span class="bg-red-100 text-red-600 text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest">Smart Review</span>` : 
+          (state.customTopic ? `<span class="bg-indigo-100 text-accent text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest truncate max-w-[200px]">Topik: ${state.customTopic}</span>` : '')}
       </div>
       <div id="lessonContent" class="flex-1 flex flex-col justify-start pb-12"></div>
     </div>
@@ -270,7 +271,7 @@ function renderLessonContent() {
       <div class="flex flex-col items-center justify-center mt-20">
         <div class="w-16 h-16 border-4 border-slate-200 border-t-accent rounded-full animate-spin mb-6"></div>
         <p class="font-bold text-accent text-lg animate-pulse">Meracik soal...</p>
-        <p class="text-xs text-slate-400 mt-2">Cek icon terminal di kiri atas buat liat prosesnya.</p>
+        <p class="text-xs text-slate-400 mt-2">Cek terminal di kiri atas buat liat prosesnya.</p>
       </div>
     `;
     return;
@@ -299,7 +300,7 @@ function renderLessonContent() {
   const feedbackHtml = state.isAnswered ? `
     <div class="mt-6 p-5 rounded-2xl animate-slide-up ${state.isCorrect ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'}">
       <p class="font-black text-xl mb-2 flex items-center gap-2 ${state.isCorrect ? 'text-success' : 'text-error'}">
-        ${state.isCorrect ? '🎉 Keren Banget!' : '💡 Belajar Lagi Ya!'}
+        ${state.isCorrect ? '🎉 Keren Banget!' : '💡 Catat, ini salah!'}
       </p>
       ${!state.isCorrect ? `<p class="font-bold mb-2 text-slate-800">Jawaban benar: <span class="text-success">${q.correctAnswer}</span></p>` : ''}
       <p class="text-sm font-medium text-slate-600 leading-relaxed">${q.explanation}</p>
@@ -363,7 +364,11 @@ function renderLessonContent() {
 async function generateExercises() {
   state.loading = true; state.error = ''; renderLessonContent();
   try {
-    const result = await fetchWithFallback(generatePrompt(state.settings), state.settings.apiKey);
+    // Tentukan mau pake mistakes atau topik custom
+    const useMistakes = state.isReviewMode ? state.progress.mistakes.slice(-10) : []; // Max 10 kesalahan terakhir biar ga terlalu panjang
+    const useTopic = state.isReviewMode ? '' : state.customTopic;
+
+    const result = await fetchWithFallback(generatePrompt(state.settings, useTopic, useMistakes), state.settings.apiKey);
     state.exercises = result; state.currentIndex = 0; state.loading = false; renderLessonContent();
   } catch (err) {
     state.error = err.message; state.loading = false; renderLessonContent();
@@ -390,9 +395,22 @@ function handleCheck() {
     state.correctCount++;
     state.progress.xp += 10;
     state.progress.todayXp += 10;
-    saveProgress(state.progress);
+    
+    // Kalau lagi di mode Review dan jawab bener, HAPUS dari daftar mistakes
+    if (state.isReviewMode) {
+      state.progress.mistakes = state.progress.mistakes.filter(m => m.question !== q.question);
+    }
+  } else {
+    // Kalau SALAH, masukin ke daftar mistakes (kalau belum ada)
+    const isExist = state.progress.mistakes.find(m => m.question === q.question);
+    if (!isExist) {
+      state.progress.mistakes.push({ question: q.question, correctAnswer: q.correctAnswer });
+      // Batasi maksimal 30 kesalahan biar localStorage ga bengkak
+      if (state.progress.mistakes.length > 30) state.progress.mistakes.shift();
+    }
   }
   
+  saveProgress(state.progress);
   state.isAnswered = true;
   renderLessonContent();
 }
