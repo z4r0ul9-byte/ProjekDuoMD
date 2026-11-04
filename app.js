@@ -11,16 +11,28 @@ let state = {
   isAnswered: false,
   isCorrect: false,
   typedAnswer: '',
-  selectedOption: null
+  selectedOption: null,
+  logs: [], // Tempat nyimpen log
+  showLogs: false // Status modal log
 };
 
 const appDiv = document.getElementById('app');
+
+// FUNGSI BUAT NAMBAHIN LOG DARI API.JS
+window.addLog = (msg, type = 'info') => {
+  const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
+  state.logs.push({ time, msg, type });
+  if (state.logs.length > 100) state.logs.shift(); // Max 100 log biar ga berat
+  if (state.showLogs) renderLogModal();
+};
 
 function init() {
   const today = getTodayString();
   if (state.progress.lastPlayedDate !== today) state.progress.todayXp = 0;
   if (state.settings.apiKey) state.view = 'home';
   else state.view = 'onboarding';
+  
+  initFloatingLogBtn(); // Bikin tombol log melayang
   render();
 }
 
@@ -46,11 +58,67 @@ function updateStreak() {
   saveProgress(state.progress);
 }
 
+// --- UI LOG TERMINAL ---
+function initFloatingLogBtn() {
+  const btn = document.createElement('button');
+  btn.id = 'floatingLogBtn';
+  btn.className = 'fixed top-4 left-4 z-40 bg-white/80 backdrop-blur border-2 border-slate-200 p-2.5 rounded-xl text-slate-500 shadow-sm hover:text-accent transition-all active:scale-95';
+  btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`;
+  btn.onclick = () => { state.showLogs = true; renderLogModal(); };
+  document.body.appendChild(btn);
+}
+
+function renderLogModal() {
+  let modal = document.getElementById('logModal');
+  if (!state.showLogs) {
+    if (modal) modal.remove();
+    return;
+  }
+  
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'logModal';
+    modal.className = 'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end p-4 sm:p-6 animate-slide-up';
+    modal.onclick = (e) => { if (e.target === modal) { state.showLogs = false; renderLogModal(); } };
+    document.body.appendChild(modal);
+  }
+  
+  let logHtml = state.logs.map(l => {
+    let color = 'text-slate-300';
+    if (l.type === 'success') color = 'text-green-400';
+    if (l.type === 'error') color = 'text-red-400';
+    if (l.type === 'accent') color = 'text-indigo-400';
+    return `<div class="mb-1.5 leading-relaxed"><span class="text-slate-500">[${l.time}]</span> <span class="${color}">${l.msg}</span></div>`;
+  }).join('');
+  
+  if (state.logs.length === 0) logHtml = '<div class="text-slate-500 italic text-center mt-4">Belum ada aktivitas...</div>';
+
+  modal.innerHTML = `
+    <div class="bg-[#0d1117] rounded-2xl border border-slate-700 w-full max-w-lg mx-auto overflow-hidden shadow-2xl flex flex-col max-h-[70vh]">
+      <div class="flex justify-between items-center px-4 py-3 bg-[#161b22] border-b border-slate-700">
+        <h3 class="text-white font-mono font-bold text-sm flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+          LinguaQuest Terminal
+        </h3>
+        <button id="btnCloseLog" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      <div class="p-4 overflow-y-auto font-mono text-xs flex-1 custom-scrollbar">
+        ${logHtml}
+      </div>
+      <div class="bg-[#161b22] p-2 text-center border-t border-slate-700">
+        <p class="text-[10px] text-slate-500 font-mono">System Logs Real-time</p>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('btnCloseLog').onclick = () => { state.showLogs = false; renderLogModal(); };
+}
+
 // --- ONBOARDING / SETTINGS ---
 function renderOnboarding() {
   appDiv.innerHTML = `
     <div class="flex-1 flex items-center justify-center p-4">
-      <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-8">
+      <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-8 mt-10">
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 text-accent rounded-2xl mb-4 shadow-inner-light">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
@@ -118,9 +186,9 @@ function renderHome() {
   if (state.progress.lastPlayedDate !== getTodayString()) state.progress.todayXp = 0;
   
   appDiv.innerHTML = `
-    <div class="flex-1 flex flex-col p-5 max-w-md mx-auto w-full pb-8">
+    <div class="flex-1 flex flex-col p-5 max-w-md mx-auto w-full pb-8 pt-16">
       <!-- Top Bar (Stats) -->
-      <div class="flex gap-4 mb-8 mt-2">
+      <div class="flex gap-4 mb-8">
         <div class="flex-1 bg-white rounded-2xl p-4 shadow-premium border border-slate-100 flex items-center gap-3">
           <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 animate-pop">
             <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
@@ -169,8 +237,8 @@ function renderHome() {
 // --- LESSON SCREEN ---
 function renderLesson() {
   appDiv.innerHTML = `
-    <div class="flex-1 flex flex-col p-5 min-h-screen max-w-lg mx-auto w-full">
-      <div class="flex items-center mb-8">
+    <div class="flex-1 flex flex-col p-5 pt-16 min-h-screen max-w-lg mx-auto w-full">
+      <div class="flex items-center mb-4">
         <button id="btnBack" class="text-slate-400 hover:text-slate-700 p-2 -ml-2 rounded-full bg-slate-200/50">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </button>
@@ -202,6 +270,7 @@ function renderLessonContent() {
       <div class="flex flex-col items-center justify-center mt-20">
         <div class="w-16 h-16 border-4 border-slate-200 border-t-accent rounded-full animate-spin mb-6"></div>
         <p class="font-bold text-accent text-lg animate-pulse">Meracik soal...</p>
+        <p class="text-xs text-slate-400 mt-2">Cek icon terminal di kiri atas buat liat prosesnya.</p>
       </div>
     `;
     return;
@@ -245,7 +314,6 @@ function renderLessonContent() {
 
   contentDiv.innerHTML = `
     <div class="w-full">
-      <!-- Progress -->
       <div class="flex items-center gap-3 mb-8">
         <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden shadow-inner">
           <div class="bg-accent h-full rounded-full transition-all duration-500 ease-out" style="width: ${progress}%"></div>
@@ -292,13 +360,59 @@ function renderLessonContent() {
   else document.getElementById('btnNext').addEventListener('click', handleNext);
 }
 
-// --- SUMMARY (SELESAI) ---
+async function generateExercises() {
+  state.loading = true; state.error = ''; renderLessonContent();
+  try {
+    const result = await fetchWithFallback(generatePrompt(state.settings), state.settings.apiKey);
+    state.exercises = result; state.currentIndex = 0; state.loading = false; renderLessonContent();
+  } catch (err) {
+    state.error = err.message; state.loading = false; renderLessonContent();
+  }
+}
+
+function playTTS(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = state.settings.targetLanguage === 'English' ? 'en-US' : 'ja-JP'; 
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
+function handleCheck() {
+  const q = state.exercises[state.currentIndex];
+  const userAns = q.options ? state.selectedOption : state.typedAnswer;
+  if (!userAns) return;
+  
+  state.isCorrect = userAns.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
+  
+  if (state.isCorrect) {
+    state.correctCount++;
+    state.progress.xp += 10;
+    state.progress.todayXp += 10;
+    saveProgress(state.progress);
+  }
+  
+  state.isAnswered = true;
+  renderLessonContent();
+}
+
+function handleNext() {
+  if (state.currentIndex < state.exercises.length - 1) {
+    state.currentIndex++; state.typedAnswer = ''; state.selectedOption = null; state.isAnswered = false; state.isCorrect = false; renderLessonContent();
+  } else {
+    updateStreak(); 
+    state.view = 'summary'; 
+    render();
+  }
+}
+
 function renderSummary() {
   const xpEarned = state.correctCount * 10;
   const isPerfect = state.correctCount === state.exercises.length;
 
   appDiv.innerHTML = `
-    <div class="flex-1 flex flex-col p-5 items-center justify-center max-w-md mx-auto w-full">
+    <div class="flex-1 flex flex-col p-5 pt-16 items-center justify-center max-w-md mx-auto w-full">
       <div class="animate-slide-up text-center w-full">
         <div class="inline-flex items-center justify-center w-32 h-32 ${isPerfect ? 'bg-yellow-100 text-yellow-500' : 'bg-indigo-100 text-accent'} rounded-full mb-8 shadow-inner relative">
           ${isPerfect ? `
