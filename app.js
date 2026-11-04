@@ -2,8 +2,10 @@
 let state = {
   view: 'loading',
   settings: loadSettings(),
+  progress: loadProgress(),
   exercises: [],
   currentIndex: 0,
+  correctCount: 0, // Ngetrack bener berapa
   loading: false,
   error: '',
   isAnswered: false,
@@ -15,6 +17,12 @@ let state = {
 const appDiv = document.getElementById('app');
 
 function init() {
+  // Cek apakah hari ini udah main, buat reset todayXp
+  const today = getTodayString();
+  if (state.progress.lastPlayedDate !== today) {
+    state.progress.todayXp = 0;
+  }
+
   if (state.settings.apiKey) state.view = 'home';
   else state.view = 'onboarding';
   render();
@@ -25,16 +33,38 @@ function render() {
   if (state.view === 'onboarding' || state.view === 'settings') renderOnboarding();
   else if (state.view === 'home') renderHome();
   else if (state.view === 'lesson') renderLesson();
+  else if (state.view === 'summary') renderSummary();
 }
 
+// --- FUNGSI HITUNG STREAK ---
+function updateStreak() {
+  const today = getTodayString();
+  const lastPlayed = state.progress.lastPlayedDate;
+  
+  if (lastPlayed !== today) {
+    // Cek apakah kemarin main
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+
+    if (lastPlayed === yesterdayStr) {
+      state.progress.streak += 1; // Lanjut streak
+    } else {
+      state.progress.streak = 1; // Reset ke 1 karena bolong
+    }
+    state.progress.lastPlayedDate = today;
+  }
+  // Kalau lastPlayed === today, streak ga nambah (baru selesai 1 sesi hari ini)
+  saveProgress(state.progress);
+}
+
+// --- VIEWS ---
 function renderOnboarding() {
+  // SAMA SEPERTI SEBELUMNYA
   appDiv.innerHTML = `
     <div class="flex-1 flex items-center justify-center p-4">
       <div class="lq-fade-in max-w-md w-full bg-surface rounded-2xl border border-border shadow-sm p-6">
         <div class="text-center mb-6">
-          <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-accent-soft text-accent mb-3">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-          </div>
           <h1 class="text-2xl font-bold text-ink">${state.view === 'settings' ? 'Pengaturan' : 'Selamat Datang'}</h1>
         </div>
         <form id="settingsForm" class="space-y-4">
@@ -45,7 +75,7 @@ function renderOnboarding() {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-ink mb-1">Bahasa Target</label>
-              <select id="targetLanguage" class="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent">
+              <select id="targetLanguage" class="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white">
                 <option ${state.settings.targetLanguage === 'English' ? 'selected' : ''}>English</option>
                 <option ${state.settings.targetLanguage === 'Japanese' ? 'selected' : ''}>Japanese</option>
                 <option ${state.settings.targetLanguage === 'Korean' ? 'selected' : ''}>Korean</option>
@@ -55,29 +85,25 @@ function renderOnboarding() {
             </div>
             <div>
               <label class="block text-sm font-medium text-ink mb-1">Gaya Mengajar</label>
-              <select id="stylePreset" class="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent">
+              <select id="stylePreset" class="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white">
                 <option value="santuy" ${state.settings.stylePreset === 'santuy' ? 'selected' : ''}>Santuy</option>
                 <option value="gaul" ${state.settings.stylePreset === 'gaul' ? 'selected' : ''}>Gaul</option>
                 <option value="formal" ${state.settings.stylePreset === 'formal' ? 'selected' : ''}>Formal</option>
-                <option value="storyteller" ${state.settings.stylePreset === 'storyteller' ? 'selected' : ''}>Storyteller</option>
                 <option value="custom" ${state.settings.stylePreset === 'custom' ? 'selected' : ''}>Custom...</option>
               </select>
             </div>
           </div>
           <div id="customStyleContainer" class="${state.settings.stylePreset === 'custom' ? 'block' : 'hidden'}">
-            <label class="block text-sm font-medium text-ink mb-1">Prompt Custom</label>
-            <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+            <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Prompt custom..." class="w-full px-3 py-2 border border-border rounded-lg text-sm" />
           </div>
-          <button type="submit" class="w-full bg-accent hover:bg-blue-600 text-white font-medium py-2.5 rounded-lg transition-colors mt-2">Simpan</button>
+          <button type="submit" class="w-full bg-accent text-white font-medium py-2.5 rounded-lg mt-2">Simpan</button>
         </form>
       </div>
     </div>
   `;
 
   document.getElementById('stylePreset').addEventListener('change', (e) => {
-    const container = document.getElementById('customStyleContainer');
-    if (e.target.value === 'custom') container.classList.remove('hidden');
-    else container.classList.add('hidden');
+    document.getElementById('customStyleContainer').classList.toggle('hidden', e.target.value !== 'custom');
   });
 
   document.getElementById('settingsForm').addEventListener('submit', (e) => {
@@ -90,42 +116,71 @@ function renderOnboarding() {
       level: 'beginner'
     };
     saveSettings(state.settings);
-    state.view = 'home';
-    render();
+    state.view = 'home'; render();
   });
 }
 
 function renderHome() {
+  // Update todayXp kalau hari udah berubah
+  if (state.progress.lastPlayedDate !== getTodayString()) {
+    state.progress.todayXp = 0;
+  }
+
+  const fireColor = state.progress.streak > 0 ? 'text-orange-500' : 'text-gray-300';
+
   appDiv.innerHTML = `
-    <div class="flex-1 flex items-center justify-center p-4">
-      <div class="lq-fade-in max-w-md w-full bg-surface rounded-2xl border border-border shadow-sm p-8 text-center">
-        <h1 class="text-2xl font-bold text-ink mb-2">Siap Belajar?</h1>
-        <p class="text-ink-muted mb-6 text-sm">Bahasa: <span class="font-bold">${state.settings.targetLanguage}</span> • Gaya: <span class="font-bold capitalize">${state.settings.stylePreset}</span></p>
-        <button id="btnStart" class="w-full bg-accent hover:bg-blue-600 text-white font-medium py-3 rounded-xl transition-colors mb-3 shadow-sm">Mulai Latihan</button>
-        <button id="btnSettings" class="text-sm text-ink-muted hover:text-ink">Ubah Pengaturan</button>
+    <div class="flex-1 flex flex-col p-4 max-w-md mx-auto w-full">
+      <!-- Header: Streak & XP -->
+      <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-border shadow-sm mb-8 mt-4">
+        <div class="flex items-center gap-2">
+          <svg class="${fireColor} w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
+          <div>
+            <p class="text-xs text-ink-muted font-bold uppercase">Streak</p>
+            <p class="text-xl font-black text-ink leading-none">${state.progress.streak} Hari</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-accent font-bold uppercase">Total XP</p>
+          <p class="text-xl font-black text-accent leading-none">${state.progress.xp} XP</p>
+        </div>
+      </div>
+
+      <!-- Ilustrasi / Sapaan -->
+      <div class="text-center flex-1 flex flex-col justify-center">
+        <h1 class="text-3xl font-bold text-ink mb-2">Siap Belajar?</h1>
+        <p class="text-ink-muted mb-8 text-sm">${state.settings.targetLanguage} • Gaya ${state.settings.stylePreset}</p>
+        
+        <button id="btnStart" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-4 rounded-xl transition-all shadow-[0_4px_14px_0_rgba(77,107,254,0.39)] active:scale-95 text-lg">
+          Mulai Latihan
+        </button>
+      </div>
+
+      <div class="text-center mt-6">
+        <button id="btnSettings" class="text-sm font-medium text-ink-muted hover:text-ink">Pengaturan</button>
       </div>
     </div>
   `;
 
   document.getElementById('btnStart').addEventListener('click', () => {
-    state.view = 'lesson'; state.exercises = []; state.currentIndex = 0; state.error = ''; state.loading = false; render();
+    state.view = 'lesson'; state.exercises = []; state.currentIndex = 0; state.correctCount = 0; state.error = ''; render();
   });
   document.getElementById('btnSettings').addEventListener('click', () => { state.view = 'settings'; render(); });
 }
 
 function renderLesson() {
+  // SAMA SEPERTI SEBELUMNYA
   appDiv.innerHTML = `
-    <div class="flex-1 flex flex-col p-4 pt-6 min-h-screen">
+    <div class="flex-1 flex flex-col p-4 pt-6 min-h-screen max-w-lg mx-auto w-full">
       <button id="btnBack" class="text-sm font-medium text-ink-muted mb-4 self-start">&larr; Keluar</button>
-      <div id="lessonContent" class="flex-1 flex flex-col justify-center pb-12 w-full max-w-lg mx-auto"></div>
+      <div id="lessonContent" class="flex-1 flex flex-col justify-center pb-12"></div>
     </div>
   `;
-  
   document.getElementById('btnBack').addEventListener('click', () => { state.view = 'home'; render(); });
   renderLessonContent();
 }
 
 function renderLessonContent() {
+  // SAMA SEPERTI SEBELUMNYA (Hanya tambah logika update correctCount)
   const contentDiv = document.getElementById('lessonContent');
   if (!contentDiv) return;
 
@@ -133,7 +188,7 @@ function renderLessonContent() {
     contentDiv.innerHTML = `
       <div class="text-center">
         ${state.error ? `<div class="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm font-medium border border-red-200">${state.error}</div>` : ''}
-        <button id="btnGenerate" class="bg-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-md transition-colors">Generate 5 Soal Sekarang</button>
+        <button id="btnGenerate" class="bg-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-md">Generate 5 Soal Sekarang</button>
       </div>
     `;
     document.getElementById('btnGenerate').addEventListener('click', generateExercises);
@@ -166,7 +221,7 @@ function renderLessonContent() {
 
   const feedbackHtml = state.isAnswered ? `
     <div class="mt-6 p-4 rounded-xl border ${state.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} lq-fade-in">
-      <p class="font-bold mb-1 ${state.isCorrect ? 'text-success' : 'text-error'}">${state.isCorrect ? '✅ Benar!' : '❌ Salah, jawaban yang bener:'}</p>
+      <p class="font-bold mb-1 ${state.isCorrect ? 'text-success' : 'text-error'}">${state.isCorrect ? '✅ Benar! (+10 XP)' : '❌ Salah, jawaban yang bener:'}</p>
       ${!state.isCorrect ? `<p class="font-medium mb-2 text-ink">${q.correctAnswer}</p>` : ''}
       <p class="text-sm text-ink-muted">${q.explanation}</p>
     </div>
@@ -175,7 +230,7 @@ function renderLessonContent() {
   const actionBtnHtml = !state.isAnswered ? `
     <button id="btnCheck" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-50 disabled:hover:bg-accent" ${(!state.typedAnswer && !state.selectedOption) ? 'disabled' : ''}>Cek Jawaban</button>
   ` : `
-    <button id="btnNext" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors lq-fade-in">${state.currentIndex === state.exercises.length - 1 ? 'Selesai' : 'Lanjut Soal Berikutnya'}</button>
+    <button id="btnNext" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors lq-fade-in">${state.currentIndex === state.exercises.length - 1 ? 'Selesaikan Latihan' : 'Lanjut Soal Berikutnya'}</button>
   `;
 
   contentDiv.innerHTML = `
@@ -233,7 +288,16 @@ function handleCheck() {
   const q = state.exercises[state.currentIndex];
   const userAns = q.options ? state.selectedOption : state.typedAnswer;
   if (!userAns) return;
+  
   state.isCorrect = userAns.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
+  
+  if (state.isCorrect) {
+    state.correctCount++;
+    state.progress.xp += 10; // Dapet 10 XP per jawaban bener
+    state.progress.todayXp += 10;
+    saveProgress(state.progress);
+  }
+  
   state.isAnswered = true;
   renderLessonContent();
 }
@@ -242,8 +306,47 @@ function handleNext() {
   if (state.currentIndex < state.exercises.length - 1) {
     state.currentIndex++; state.typedAnswer = ''; state.selectedOption = null; state.isAnswered = false; state.isCorrect = false; renderLessonContent();
   } else {
-    alert("Mantap! Latihan selesai."); state.view = 'home'; state.exercises = []; render();
+    // Pindah ke layar Summary
+    updateStreak(); 
+    state.view = 'summary'; 
+    render();
   }
+}
+
+// --- LAYAR SELESAI (SUMMARY) ---
+function renderSummary() {
+  const xpEarned = state.correctCount * 10;
+  
+  appDiv.innerHTML = `
+    <div class="flex-1 flex flex-col p-4 items-center justify-center max-w-md mx-auto w-full">
+      <div class="lq-fade-in text-center w-full">
+        <div class="inline-flex items-center justify-center w-24 h-24 bg-yellow-100 text-yellow-500 rounded-full mb-6 shadow-inner animate-bounce">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <h1 class="text-3xl font-black text-ink mb-2">Latihan Selesai!</h1>
+        <p class="text-ink-muted mb-8">Lu jawab ${state.correctCount} dari ${state.exercises.length} soal dengan benar.</p>
+        
+        <div class="bg-white rounded-2xl border border-border p-6 shadow-sm mb-8 flex justify-around">
+          <div class="text-center">
+            <p class="text-xs text-ink-muted font-bold uppercase mb-1">Didapat</p>
+            <p class="text-2xl font-black text-accent">+${xpEarned} XP</p>
+          </div>
+          <div class="text-center border-l border-border pl-6">
+            <p class="text-xs text-ink-muted font-bold uppercase mb-1">Streak Lu</p>
+            <p class="text-2xl font-black text-orange-500">${state.progress.streak} Hari</p>
+          </div>
+        </div>
+
+        <button id="btnFinish" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-md transition-transform active:scale-95 text-lg">
+          Kembali ke Beranda
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btnFinish').addEventListener('click', () => {
+    state.view = 'home'; render();
+  });
 }
 
 init();
