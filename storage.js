@@ -22,12 +22,13 @@ const saveSettings = (settings) => {
   } catch(e) {}
 };
 
-// --- PROGRESS (XP & STREAK) ---
+// --- PROGRESS (XP, STREAK, & MISTAKES) ---
 const DEFAULT_PROGRESS = {
   xp: 0,
   streak: 0,
   lastPlayedDate: '',
-  todayXp: 0
+  todayXp: 0,
+  mistakes: [] // <--- Array buat nyimpen soal yang salah
 };
 
 const loadProgress = () => {
