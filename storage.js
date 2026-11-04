@@ -5,12 +5,18 @@ const DEFAULT_SETTINGS = {
   stylePreset: 'santuy',
   customStylePrompt: '',
   level: 'beginner',
+  // FITUR BARU: Custom Assets
+  customAssets: {
+    mascot: '🦉', // Default emoji
+    achievements: {} // Key-value buat nyimpen custom icon medali
+  }
 };
 
 const loadSettings = () => {
   try {
     const raw = localStorage.getItem('linguaquest.settings');
-    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
+    // Pake spread operator buat mastiin kalau customAssets tetep ada meskipun data lama
+    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw), customAssets: { ...DEFAULT_SETTINGS.customAssets, ...(JSON.parse(raw).customAssets || {}) } } : DEFAULT_SETTINGS;
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -22,13 +28,17 @@ const saveSettings = (settings) => {
   } catch(e) {}
 };
 
-// --- PROGRESS (XP, STREAK, & MISTAKES) ---
+// --- PROGRESS (XP, STREAK, & MISTAKES & ACHIEVEMENTS) ---
 const DEFAULT_PROGRESS = {
   xp: 0,
   streak: 0,
   lastPlayedDate: '',
   todayXp: 0,
-  mistakes: [] // <--- Array buat nyimpen soal yang salah
+  mistakes: [],
+  // FITUR BARU
+  sessionsCompleted: 0,
+  healedMistakes: 0,
+  unlockedAchievements: []
 };
 
 const loadProgress = () => {

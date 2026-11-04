@@ -16,11 +16,10 @@ let state = {
   showLogs: false,
   customTopic: '',
   isReviewMode: false,
-  // STATE BARU
-  settingsTab: 'general', // 'general' | 'custom'
-  mascotState: 'idle', // 'idle' | 'thinking' | 'success' | 'fail'
-  mascotSpeech: null, // Teks motivasi
-  showAchievementPopup: null // Nyimpen data medali yang baru di-unlock
+  settingsTab: 'general',
+  mascotState: 'idle',
+  mascotSpeech: null,
+  showAchievementPopup: null
 };
 
 const appDiv = document.getElementById('app');
@@ -54,7 +53,7 @@ function init() {
   else state.view = 'onboarding';
   
   if(!document.getElementById('floatingLogBtn')) initFloatingLogBtn(); 
-  initMascotDOM(); // Bikin maskot global
+  initMascotDOM();
   render();
 }
 
@@ -65,7 +64,7 @@ function render() {
   else if (state.view === 'lesson') renderLesson();
   else if (state.view === 'summary') renderSummary();
   
-  updateMascotVisuals(); // Update tampilan maskot tiap ganti halaman
+  updateMascotVisuals();
 }
 
 // --- LOG TERMINAL ---
@@ -117,7 +116,6 @@ function initMascotDOM() {
   
   const container = document.createElement('div');
   container.id = 'mascotContainer';
-  // Posisi di pojok kanan atas, di bawah header
   container.className = 'fixed top-20 right-4 z-40 cursor-pointer flex flex-col items-center transition-all duration-300';
   container.onclick = handleMascotClick;
   
@@ -137,13 +135,11 @@ function updateMascotVisuals() {
   const avatar = document.getElementById('mascotAvatar');
   if (!avatar) return;
   
-  // Ambil asset dari setting
+  // Ambil asset dari setting (pake optional chaining biar ga error kalau data kosong)
   const asset = state.settings.customAssets?.mascot || '🦉';
   
-  // Reset animasi
   avatar.className = 'w-16 h-16 flex items-center justify-center text-5xl drop-shadow-lg';
   
-  // Cek tipe asset (URL Video, URL Gambar, Base64, atau Emoji)
   if (asset.startsWith('http') && (asset.includes('.mp4') || asset.includes('.webm'))) {
     if(avatar.tagName !== 'VIDEO') {
       avatar.innerHTML = `<video src="${asset}" autoplay loop muted playsinline class="w-full h-full object-contain rounded-xl"></video>`;
@@ -153,18 +149,15 @@ function updateMascotVisuals() {
       avatar.innerHTML = `<img src="${asset}" class="w-full h-full object-contain" />`;
     }
   } else {
-    // Anggap Emoji
     if(avatar.tagName !== 'DIV') avatar.innerHTML = '';
     avatar.innerText = asset;
   }
 
-  // Terapkan state animasi
   if (state.mascotState === 'idle') avatar.classList.add('mascot-idle');
   else if (state.mascotState === 'thinking') avatar.classList.add('mascot-thinking');
   else if (state.mascotState === 'success') avatar.classList.add('mascot-success');
   else if (state.mascotState === 'fail') avatar.classList.add('mascot-fail');
   
-  // Handle Speech Bubble
   const bubble = document.getElementById('mascotBubble');
   const text = document.getElementById('mascotText');
   if (state.mascotSpeech) {
@@ -179,7 +172,6 @@ function triggerMascot(stateName) {
   state.mascotState = stateName;
   updateMascotVisuals();
   
-  // Balikin ke idle setelah beberapa saat
   if (stateName !== 'idle' && stateName !== 'thinking') {
     setTimeout(() => {
       state.mascotState = 'idle';
@@ -190,13 +182,9 @@ function triggerMascot(stateName) {
 
 function handleMascotClick() {
   if (state.mascotState === 'thinking') return;
-  
-  // Tampilin teks motivasi random
   const randomMsg = MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)];
   state.mascotSpeech = randomMsg;
   updateMascotVisuals();
-  
-  // Hilangkan setelah 3 detik
   setTimeout(() => {
     state.mascotSpeech = null;
     updateMascotVisuals();
@@ -208,7 +196,7 @@ function checkAchievements(correctCount, totalCount) {
   let newlyUnlocked = [];
 
   ACHIEVEMENTS.forEach(ach => {
-    if (state.progress.unlockedAchievements.includes(ach.id)) return; // Udah punya
+    if (state.progress.unlockedAchievements.includes(ach.id)) return; 
     
     let unlocked = false;
     if (ach.id === 'first_step' && state.progress.sessionsCompleted >= 1) unlocked = true;
@@ -226,7 +214,6 @@ function checkAchievements(correctCount, totalCount) {
 
   if (newlyUnlocked.length > 0) {
     saveProgress(state.progress);
-    // Antri popup (tampilin satu-satu kalau dapet lebih dari 1)
     showAchievementPopupQueue = newlyUnlocked;
     renderAchievementPopup();
   }
@@ -248,8 +235,7 @@ function renderAchievementPopup() {
     document.body.appendChild(popup);
   }
   
-  // Ambil custom icon kalau ada
-  const customIcon = state.settings.customAssets.achievements[ach.id];
+  const customIcon = state.settings.customAssets?.achievements?.[ach.id];
   let iconHtml = `<span class="text-6xl">${ach.icon}</span>`;
   if (customIcon) {
     if (customIcon.startsWith('http') || customIcon.startsWith('data:image')) {
@@ -261,7 +247,6 @@ function renderAchievementPopup() {
 
   popup.innerHTML = `
     <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
-      <!-- Confetti CSS Sederhana -->
       <div class="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20">
         <div class="absolute top-4 left-4 text-3xl animate-bounce">🎉</div>
         <div class="absolute top-10 right-4 text-2xl animate-ping">✨</div>
@@ -334,7 +319,6 @@ function renderOnboarding() {
 
   let customContent = `
     <div class="space-y-6">
-      <!-- Kustom Maskot -->
       <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
         <label class="block text-sm font-bold text-slate-800 mb-2">Tampilan Maskot</label>
         <div class="flex gap-2 mb-3">
@@ -353,7 +337,6 @@ function renderOnboarding() {
         </div>
       </div>
 
-      <!-- Kustom Medali (Loop 6 Medali) -->
       <div>
         <label class="block text-sm font-bold text-slate-800 mb-2">Icon Medali (Opsional)</label>
         <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
@@ -362,7 +345,7 @@ function renderOnboarding() {
               <span class="text-xl">${a.icon}</span>
               <div class="flex-1">
                 <p class="text-[10px] font-bold text-slate-600 truncate">${a.title}</p>
-                <input type="text" placeholder="URL Gif/PNG" class="w-full text-[10px] px-1 py-0.5 border border-slate-300 rounded mt-1" value="${state.settings.customAssets.achievements[a.id] && state.settings.customAssets.achievements[a.id].startsWith('http') ? state.settings.customAssets.achievements[a.id] : ''}" onchange="applyAchievementAsset('${a.id}', this.value)" />
+                <input type="text" placeholder="URL Gif/PNG" class="w-full text-[10px] px-1 py-0.5 border border-slate-300 rounded mt-1" value="${state.settings.customAssets?.achievements?.[a.id]?.startsWith('http') ? state.settings.customAssets.achievements[a.id] : ''}" onchange="applyAchievementAsset('${a.id}', this.value)" />
               </div>
             </div>
           `).join('')}
@@ -399,7 +382,6 @@ function renderOnboarding() {
     </div>
   `;
 
-  // Logic Tabs
   if (state.view === 'settings') {
     document.getElementById('tabGeneral').addEventListener('click', () => { state.settingsTab = 'general'; render(); });
     document.getElementById('tabCustom').addEventListener('click', () => { state.settingsTab = 'custom'; render(); });
@@ -411,11 +393,10 @@ function renderOnboarding() {
         alert('Kustomisasi tersimpan!');
         state.view = 'home'; render();
       });
-      return; // Skip render form umum
+      return; 
     }
   }
 
-  // Logic Form Umum
   document.getElementById('stylePreset').addEventListener('change', (e) => {
     document.getElementById('customStyleContainer').classList.toggle('hidden', e.target.value !== 'custom');
   });
@@ -434,12 +415,11 @@ function renderOnboarding() {
   });
 }
 
-// Helper buat handle Custom Assets
 window.applyMascotAsset = (val) => {
   if (val.trim() === '') return;
   state.settings.customAssets.mascot = val;
   saveSettings(state.settings);
-  updateMascotVisuals(); // Langsung update tampilan
+  updateMascotVisuals(); 
 };
 
 window.applyAchievementAsset = (id, val) => {
@@ -473,10 +453,9 @@ function renderHome() {
   if (state.progress.lastPlayedDate !== getTodayString()) state.progress.todayXp = 0;
   const hasMistakes = state.progress.mistakes && state.progress.mistakes.length > 0;
   
-  // Render Medali
   const medaliHtml = ACHIEVEMENTS.map(ach => {
     const isUnlocked = state.progress.unlockedAchievements.includes(ach.id);
-    const customIcon = state.settings.customAssets.achievements[ach.id];
+    const customIcon = state.settings.customAssets?.achievements?.[ach.id];
     
     let iconHtml = isUnlocked ? `<span class="text-3xl">${ach.icon}</span>` : `<span class="text-3xl opacity-30 grayscale">${ach.icon}</span>`;
     if (isUnlocked && customIcon) {
@@ -513,7 +492,6 @@ function renderHome() {
         </div>
       </div>
 
-      <!-- Topik Custom -->
       <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
         <label class="block text-sm font-bold text-slate-700 mb-2">Mau belajar apa hari ini?</label>
         <input type="text" id="topicInput" value="${state.customTopic}" placeholder="Misal: Makanan, Past Tense..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent mb-3" />
@@ -522,7 +500,6 @@ function renderHome() {
         </button>
       </div>
 
-      <!-- Smart Review -->
       ${hasMistakes ? `
         <div class="bg-red-50 rounded-2xl p-4 shadow-sm border-2 border-red-100 mb-6 animate-slide-up">
           <div class="flex items-center gap-3 mb-3">
@@ -538,7 +515,6 @@ function renderHome() {
         </div>
       ` : ''}
 
-      <!-- Achievements Grid -->
       <div class="mt-2 mb-8">
         <h3 class="text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Pencapaian</h3>
         <div class="flex gap-4 overflow-x-auto hide-scrollbar pb-2">
@@ -698,7 +674,7 @@ function renderLessonContent() {
 
 async function generateExercises() {
   state.loading = true; state.error = ''; 
-  triggerMascot('thinking'); // Animasi Thinking
+  triggerMascot('thinking'); 
   renderLessonContent();
   
   try {
@@ -707,11 +683,11 @@ async function generateExercises() {
 
     const result = await fetchWithFallback(generatePrompt(state.settings, useTopic, useMistakes), state.settings.apiKey);
     state.exercises = result; state.currentIndex = 0; state.loading = false; 
-    triggerMascot('idle'); // Balik idle
+    triggerMascot('idle'); 
     renderLessonContent();
   } catch (err) {
     state.error = err.message; state.loading = false; 
-    triggerMascot('fail'); // Animasi Fail
+    triggerMascot('fail'); 
     renderLessonContent();
   }
 }
@@ -736,15 +712,14 @@ function handleCheck() {
     state.correctCount++;
     state.progress.xp += 10;
     state.progress.todayXp += 10;
-    triggerMascot('success'); // Animasi Success
+    triggerMascot('success'); 
     
-    // Kalau di Review Mode & bener, hitung healed
     if (state.isReviewMode) {
       state.progress.mistakes = state.progress.mistakes.filter(m => m.question !== q.question);
       state.progress.healedMistakes = (state.progress.healedMistakes || 0) + 1;
     }
   } else {
-    triggerMascot('fail'); // Animasi Fail
+    triggerMascot('fail'); 
     const isExist = state.progress.mistakes.find(m => m.question === q.question);
     if (!isExist) {
       state.progress.mistakes.push({ question: q.question, correctAnswer: q.correctAnswer });
@@ -765,7 +740,6 @@ function handleNext() {
     state.progress.sessionsCompleted = (state.progress.sessionsCompleted || 0) + 1;
     saveProgress(state.progress);
     
-    // Cek Achievements di akhir sesi
     checkAchievements(state.correctCount, state.exercises.length);
     
     state.view = 'summary'; 
