@@ -1,15 +1,14 @@
 // storage.js
 const DEFAULT_SETTINGS = {
   apiKey: '',
+  provider: 'gemini', // 'gemini' | 'custom'
+  modelName: 'gemini-3.6-flash', // Default model
+  customBaseUrl: 'https://api.openai.com/v1', // Base URL buat custom
   targetLanguage: 'English',
   stylePreset: 'santuy',
   customStylePrompt: '',
   level: 'beginner',
-  customAssets: {
-    mascot: '🦉',
-    achievements: {}
-  },
-  // FITUR BARU: Memory Bank
+  customAssets: { mascot: '🦉', achievements: {} },
   memoryBank: []
 };
 
@@ -30,9 +29,7 @@ const loadSettings = () => {
 };
 
 const saveSettings = (settings) => {
-  try {
-    localStorage.setItem('linguaquest.settings', JSON.stringify(settings));
-  } catch(e) {}
+  try { localStorage.setItem('linguaquest.settings', JSON.stringify(settings)); } catch(e) {}
 };
 
 const DEFAULT_PROGRESS = {
