@@ -30,45 +30,42 @@
   </script>
   <style>
     body { font-family: 'Nunito', sans-serif; -webkit-tap-highlight-color: transparent; }
-    
-    /* Animasi Umum */
     @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
     .animate-pop { animation: pop 0.3s ease-in-out; }
     @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
     @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
     .animate-slide-in-right { animation: slideInRight 0.3s ease-out both; }
-    
-    /* Tombol 3D */
     .btn-3d { transition: all 0.1s ease; border-bottom-width: 4px; }
     .btn-3d:active { transform: translateY(4px); border-bottom-width: 0px; margin-bottom: 4px; }
-    
-    /* Pulse Glow */
     @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 15px rgba(79, 70, 229, 0.2); } 50% { box-shadow: 0 0 25px rgba(79, 70, 229, 0.6); } }
     .btn-pulse { animation: pulseGlow 2s infinite; }
-
-    /* Animasi Maskot */
     @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
     .mascot-idle { animation: float 3s ease-in-out infinite; }
-    
     @keyframes shake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
     .mascot-fail { animation: shake 0.4s ease-in-out; }
-    
     @keyframes jump { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-25px) scale(1.1); } }
     .mascot-success { animation: jump 0.6s ease-out; }
-    
     @keyframes spin { 100% { transform: rotate(360deg); } }
     .mascot-thinking { animation: spin 2s linear infinite; }
-    
     @keyframes wink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.5); } }
     .mascot-wink { animation: wink 0.4s ease-in-out; }
-
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
 <body class="bg-bg text-slate-800 antialiased">
   <div id="app" class="min-h-screen flex flex-col"></div>
+
+  <!-- ERROR DETEKTOR: Biar ga blank putih kalau ada error -->
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      const app = document.getElementById('app');
+      if (app) {
+        app.innerHTML = `<div class="p-6 text-red-600 bg-red-50 min-h-screen font-mono text-sm"><h2 class="text-xl font-bold mb-4">⚠️ Ada Error di Kode</h2><p class="font-bold mb-2">${msg}</p><p class="mb-2">File: ${url}:${line}</p><pre class="bg-white p-4 rounded overflow-auto max-h-96 border border-red-200">${error ? error.stack : 'Tidak ada detail'}</pre></div>`;
+      }
+    };
+  </script>
 
   <script src="storage.js"></script>
   <script src="api.js"></script>
