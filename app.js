@@ -14,12 +14,31 @@ let state = {
   selectedOption: null,
   logs: [], 
   showLogs: false,
-  // State buat Otodidak
   customTopic: '',
-  isReviewMode: false
+  isReviewMode: false,
+  // STATE BARU
+  settingsTab: 'general', // 'general' | 'custom'
+  mascotState: 'idle', // 'idle' | 'thinking' | 'success' | 'fail'
+  mascotSpeech: null, // Teks motivasi
+  showAchievementPopup: null // Nyimpen data medali yang baru di-unlock
 };
 
 const appDiv = document.getElementById('app');
+
+// DATA MEDALI
+const ACHIEVEMENTS = [
+  { id: 'first_step', title: 'First Step', desc: 'Selesaikan 1 sesi', icon: '🥇' },
+  { id: 'perfect', title: 'Perfect!', desc: 'Dapat 5/5', icon: '💯' },
+  { id: 'streak_7', title: 'On Fire', desc: 'Streak 7 hari', icon: '🔥' },
+  { id: 'xp_1000', title: 'Bookworm', desc: '1000 XP', icon: '📚' },
+  { id: 'healer', title: 'Healer', desc: 'Pulihkan 5 salah', icon: '🩹' },
+  { id: 'master', title: 'Master', desc: '5000 XP', icon: '👑' }
+];
+
+const MOTIVATIONS = [
+  "Semangat belajarnya! 🔥", "Jangan lupa istirahat ya 💤", "Wah makin jago aja! 🌟",
+  "Konsisten itu kuncinya 💪", "Ayo taklukkan hari ini! 🚀", "Salah itu tandanya belajar 🤓"
+];
 
 window.addLog = (msg, type = 'info') => {
   const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
@@ -35,6 +54,7 @@ function init() {
   else state.view = 'onboarding';
   
   if(!document.getElementById('floatingLogBtn')) initFloatingLogBtn(); 
+  initMascotDOM(); // Bikin maskot global
   render();
 }
 
@@ -44,6 +64,8 @@ function render() {
   else if (state.view === 'home') renderHome();
   else if (state.view === 'lesson') renderLesson();
   else if (state.view === 'summary') renderSummary();
+  
+  updateMascotVisuals(); // Update tampilan maskot tiap ganti halaman
 }
 
 // --- LOG TERMINAL ---
@@ -89,6 +111,179 @@ function renderLogModal() {
   document.getElementById('btnCloseLog').onclick = () => { state.showLogs = false; renderLogModal(); };
 }
 
+// --- MASCOT GLOBAL LOGIC ---
+function initMascotDOM() {
+  if (document.getElementById('mascotContainer')) return;
+  
+  const container = document.createElement('div');
+  container.id = 'mascotContainer';
+  // Posisi di pojok kanan atas, di bawah header
+  container.className = 'fixed top-20 right-4 z-40 cursor-pointer flex flex-col items-center transition-all duration-300';
+  container.onclick = handleMascotClick;
+  
+  container.innerHTML = `
+    <div id="mascotBubble" class="hidden absolute -top-14 right-0 bg-white border-2 border-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl shadow-lg whitespace-nowrap z-50">
+      <div class="absolute -bottom-2 right-4 w-3 h-3 bg-white border-b-2 border-r-2 border-slate-200 transform rotate-45"></div>
+      <span id="mascotText"></span>
+    </div>
+    <div id="mascotAvatar" class="w-16 h-16 flex items-center justify-center text-5xl drop-shadow-lg">
+      🦉
+    </div>
+  `;
+  document.body.appendChild(container);
+}
+
+function updateMascotVisuals() {
+  const avatar = document.getElementById('mascotAvatar');
+  if (!avatar) return;
+  
+  // Ambil asset dari setting
+  const asset = state.settings.customAssets?.mascot || '🦉';
+  
+  // Reset animasi
+  avatar.className = 'w-16 h-16 flex items-center justify-center text-5xl drop-shadow-lg';
+  
+  // Cek tipe asset (URL Video, URL Gambar, Base64, atau Emoji)
+  if (asset.startsWith('http') && (asset.includes('.mp4') || asset.includes('.webm'))) {
+    if(avatar.tagName !== 'VIDEO') {
+      avatar.innerHTML = `<video src="${asset}" autoplay loop muted playsinline class="w-full h-full object-contain rounded-xl"></video>`;
+    }
+  } else if (asset.startsWith('http') || asset.startsWith('data:image')) {
+    if(avatar.tagName !== 'IMG') {
+      avatar.innerHTML = `<img src="${asset}" class="w-full h-full object-contain" />`;
+    }
+  } else {
+    // Anggap Emoji
+    if(avatar.tagName !== 'DIV') avatar.innerHTML = '';
+    avatar.innerText = asset;
+  }
+
+  // Terapkan state animasi
+  if (state.mascotState === 'idle') avatar.classList.add('mascot-idle');
+  else if (state.mascotState === 'thinking') avatar.classList.add('mascot-thinking');
+  else if (state.mascotState === 'success') avatar.classList.add('mascot-success');
+  else if (state.mascotState === 'fail') avatar.classList.add('mascot-fail');
+  
+  // Handle Speech Bubble
+  const bubble = document.getElementById('mascotBubble');
+  const text = document.getElementById('mascotText');
+  if (state.mascotSpeech) {
+    text.innerText = state.mascotSpeech;
+    bubble.classList.remove('hidden');
+  } else {
+    bubble.classList.add('hidden');
+  }
+}
+
+function triggerMascot(stateName) {
+  state.mascotState = stateName;
+  updateMascotVisuals();
+  
+  // Balikin ke idle setelah beberapa saat
+  if (stateName !== 'idle' && stateName !== 'thinking') {
+    setTimeout(() => {
+      state.mascotState = 'idle';
+      updateMascotVisuals();
+    }, 2000);
+  }
+}
+
+function handleMascotClick() {
+  if (state.mascotState === 'thinking') return;
+  
+  // Tampilin teks motivasi random
+  const randomMsg = MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)];
+  state.mascotSpeech = randomMsg;
+  updateMascotVisuals();
+  
+  // Hilangkan setelah 3 detik
+  setTimeout(() => {
+    state.mascotSpeech = null;
+    updateMascotVisuals();
+  }, 3000);
+}
+
+// --- ACHIEVEMENTS LOGIC ---
+function checkAchievements(correctCount, totalCount) {
+  let newlyUnlocked = [];
+
+  ACHIEVEMENTS.forEach(ach => {
+    if (state.progress.unlockedAchievements.includes(ach.id)) return; // Udah punya
+    
+    let unlocked = false;
+    if (ach.id === 'first_step' && state.progress.sessionsCompleted >= 1) unlocked = true;
+    if (ach.id === 'perfect' && correctCount === totalCount) unlocked = true;
+    if (ach.id === 'streak_7' && state.progress.streak >= 7) unlocked = true;
+    if (ach.id === 'xp_1000' && state.progress.xp >= 1000) unlocked = true;
+    if (ach.id === 'healer' && state.progress.healedMistakes >= 5) unlocked = true;
+    if (ach.id === 'master' && state.progress.xp >= 5000) unlocked = true;
+    
+    if (unlocked) {
+      state.progress.unlockedAchievements.push(ach.id);
+      newlyUnlocked.push(ach);
+    }
+  });
+
+  if (newlyUnlocked.length > 0) {
+    saveProgress(state.progress);
+    // Antri popup (tampilin satu-satu kalau dapet lebih dari 1)
+    showAchievementPopupQueue = newlyUnlocked;
+    renderAchievementPopup();
+  }
+}
+
+let showAchievementPopupQueue = [];
+function renderAchievementPopup() {
+  let popup = document.getElementById('achPopup');
+  if (showAchievementPopupQueue.length === 0) {
+    if (popup) popup.remove();
+    return;
+  }
+  
+  const ach = showAchievementPopupQueue[0];
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'achPopup';
+    popup.className = 'fixed inset-0 z-[60] bg-black/70 backdrop-blur flex items-center justify-center p-4 animate-pop';
+    document.body.appendChild(popup);
+  }
+  
+  // Ambil custom icon kalau ada
+  const customIcon = state.settings.customAssets.achievements[ach.id];
+  let iconHtml = `<span class="text-6xl">${ach.icon}</span>`;
+  if (customIcon) {
+    if (customIcon.startsWith('http') || customIcon.startsWith('data:image')) {
+       iconHtml = `<img src="${customIcon}" class="w-24 h-24 object-contain" />`;
+    } else {
+       iconHtml = `<span class="text-6xl">${customIcon}</span>`;
+    }
+  }
+
+  popup.innerHTML = `
+    <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden">
+      <!-- Confetti CSS Sederhana -->
+      <div class="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20">
+        <div class="absolute top-4 left-4 text-3xl animate-bounce">🎉</div>
+        <div class="absolute top-10 right-4 text-2xl animate-ping">✨</div>
+      </div>
+      
+      <h2 class="text-sm font-black text-accent tracking-widest uppercase mb-4">Achievement Unlocked!</h2>
+      <div class="w-32 h-32 mx-auto bg-slate-50 rounded-full flex items-center justify-center mb-4 border-4 border-yellow-200 shadow-inner">
+        ${iconHtml}
+      </div>
+      <h3 class="text-2xl font-black text-slate-800 mb-1">${ach.title}</h3>
+      <p class="text-slate-500 font-medium mb-6">${ach.desc}</p>
+      
+      <button id="btnCloseAch" class="w-full btn-3d bg-accent border-accent-dark text-white font-black text-lg py-3 rounded-xl">KEREN!</button>
+    </div>
+  `;
+  
+  document.getElementById('btnCloseAch').onclick = () => {
+    showAchievementPopupQueue.shift();
+    renderAchievementPopup();
+  };
+}
+
 function updateStreak() {
   const today = getTodayString();
   const lastPlayed = state.progress.lastPlayedDate;
@@ -102,52 +297,125 @@ function updateStreak() {
   saveProgress(state.progress);
 }
 
-// --- ONBOARDING ---
+// --- ONBOARDING / SETTINGS ---
 function renderOnboarding() {
+  let generalContent = `
+    <form id="settingsForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-bold text-slate-700 mb-1">Gemini API Key</label>
+        <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-1">Bahasa</label>
+          <select id="targetLanguage" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
+            <option ${state.settings.targetLanguage === 'English' ? 'selected' : ''}>English</option>
+            <option ${state.settings.targetLanguage === 'Japanese' ? 'selected' : ''}>Japanese</option>
+            <option ${state.settings.targetLanguage === 'Korean' ? 'selected' : ''}>Korean</option>
+            <option ${state.settings.targetLanguage === 'Spanish' ? 'selected' : ''}>Spanish</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-1">Gaya</label>
+          <select id="stylePreset" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
+            <option value="santuy" ${state.settings.stylePreset === 'santuy' ? 'selected' : ''}>Santuy</option>
+            <option value="gaul" ${state.settings.stylePreset === 'gaul' ? 'selected' : ''}>Gaul</option>
+            <option value="formal" ${state.settings.stylePreset === 'formal' ? 'selected' : ''}>Formal</option>
+            <option value="custom" ${state.settings.stylePreset === 'custom' ? 'selected' : ''}>Custom</option>
+          </select>
+        </div>
+      </div>
+      <div id="customStyleContainer" class="${state.settings.stylePreset === 'custom' ? 'block' : 'hidden'}">
+        <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-accent" />
+      </div>
+      <button type="submit" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3 rounded-2xl mt-4">Simpan</button>
+    </form>
+  `;
+
+  let customContent = `
+    <div class="space-y-6">
+      <!-- Kustom Maskot -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <label class="block text-sm font-bold text-slate-800 mb-2">Tampilan Maskot</label>
+        <div class="flex gap-2 mb-3">
+          <input type="text" id="mascotUrl" placeholder="Tempel URL (GIF/MP4/PNG)" value="${state.settings.customAssets.mascot.startsWith('http') ? state.settings.customAssets.mascot : ''}" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+          <button type="button" onclick="applyMascotAsset(document.getElementById('mascotUrl').value)" class="bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-bold">Set</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-slate-500">Atau Upload (Max 1MB):</span>
+          <input type="file" id="mascotFile" accept="image/png, image/jpeg, image/gif" class="text-xs" onchange="handleFileUpload(event, 'mascot')" />
+        </div>
+        <div class="mt-2 flex gap-2">
+           <button onclick="applyMascotAsset('🦉')" class="text-2xl hover:scale-110 transition">🦉</button>
+           <button onclick="applyMascotAsset('🐱')" class="text-2xl hover:scale-110 transition">🐱</button>
+           <button onclick="applyMascotAsset('🐶')" class="text-2xl hover:scale-110 transition">🐶</button>
+           <button onclick="applyMascotAsset('🐉')" class="text-2xl hover:scale-110 transition">🐉</button>
+        </div>
+      </div>
+
+      <!-- Kustom Medali (Loop 6 Medali) -->
+      <div>
+        <label class="block text-sm font-bold text-slate-800 mb-2">Icon Medali (Opsional)</label>
+        <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
+          ${ACHIEVEMENTS.map(a => `
+            <div class="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center gap-2">
+              <span class="text-xl">${a.icon}</span>
+              <div class="flex-1">
+                <p class="text-[10px] font-bold text-slate-600 truncate">${a.title}</p>
+                <input type="text" placeholder="URL Gif/PNG" class="w-full text-[10px] px-1 py-0.5 border border-slate-300 rounded mt-1" value="${state.settings.customAssets.achievements[a.id] && state.settings.customAssets.achievements[a.id].startsWith('http') ? state.settings.customAssets.achievements[a.id] : ''}" onchange="applyAchievementAsset('${a.id}', this.value)" />
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <button id="btnSaveCustom" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3 rounded-2xl">Simpan Kustomisasi</button>
+    </div>
+  `;
+
   appDiv.innerHTML = `
     <div class="flex-1 flex items-center justify-center p-4 pt-16">
-      <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-8">
-        <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 text-accent rounded-2xl mb-4 shadow-inner-light">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-          </div>
-          <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">${state.view === 'settings' ? 'Pengaturan' : 'LinguaQuest'}</h1>
-          <p class="text-slate-500 font-medium mt-1">Belajar bahasa, gaya kamu sendiri.</p>
+      <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-6 sm:p-8">
+        
+        <div class="text-center mb-6">
+          <h1 class="text-2xl font-extrabold text-slate-800 tracking-tight">${state.view === 'onboarding' ? 'Selamat Datang' : 'Pengaturan'}</h1>
         </div>
-        <form id="settingsForm" class="space-y-5">
-          <div>
-            <label class="block text-sm font-bold text-slate-700 mb-2">Gemini API Key</label>
-            <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" />
+
+        <!-- TABS -->
+        ${state.view === 'settings' ? `
+          <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
+            <button id="tabGeneral" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all ${state.settingsTab === 'general' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}">Umum</button>
+            <button id="tabCustom" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all ${state.settingsTab === 'custom' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}">Kustomisasi</button>
           </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2">Bahasa</label>
-              <select id="targetLanguage" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
-                <option ${state.settings.targetLanguage === 'English' ? 'selected' : ''}>English</option>
-                <option ${state.settings.targetLanguage === 'Japanese' ? 'selected' : ''}>Japanese</option>
-                <option ${state.settings.targetLanguage === 'Korean' ? 'selected' : ''}>Korean</option>
-                <option ${state.settings.targetLanguage === 'Spanish' ? 'selected' : ''}>Spanish</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2">Gaya</label>
-              <select id="stylePreset" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
-                <option value="santuy" ${state.settings.stylePreset === 'santuy' ? 'selected' : ''}>Santuy</option>
-                <option value="gaul" ${state.settings.stylePreset === 'gaul' ? 'selected' : ''}>Gaul</option>
-                <option value="formal" ${state.settings.stylePreset === 'formal' ? 'selected' : ''}>Formal</option>
-                <option value="custom" ${state.settings.stylePreset === 'custom' ? 'selected' : ''}>Custom</option>
-              </select>
-            </div>
+        ` : ''}
+
+        ${state.settingsTab === 'general' || state.view === 'onboarding' ? generalContent : customContent}
+        
+        ${state.view === 'settings' ? `
+          <div class="text-center mt-6">
+             <button id="btnBackHome" class="text-sm font-bold text-slate-400 hover:text-slate-700">Kembali ke Beranda</button>
           </div>
-          <div id="customStyleContainer" class="${state.settings.stylePreset === 'custom' ? 'block' : 'hidden'}">
-            <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-accent" />
-          </div>
-          <button type="submit" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3.5 rounded-2xl mt-4">Simpan</button>
-        </form>
+        ` : ''}
       </div>
     </div>
   `;
 
+  // Logic Tabs
+  if (state.view === 'settings') {
+    document.getElementById('tabGeneral').addEventListener('click', () => { state.settingsTab = 'general'; render(); });
+    document.getElementById('tabCustom').addEventListener('click', () => { state.settingsTab = 'custom'; render(); });
+    document.getElementById('btnBackHome').addEventListener('click', () => { state.view = 'home'; render(); });
+
+    if (state.settingsTab === 'custom') {
+      document.getElementById('btnSaveCustom').addEventListener('click', () => {
+        saveSettings(state.settings);
+        alert('Kustomisasi tersimpan!');
+        state.view = 'home'; render();
+      });
+      return; // Skip render form umum
+    }
+  }
+
+  // Logic Form Umum
   document.getElementById('stylePreset').addEventListener('change', (e) => {
     document.getElementById('customStyleContainer').classList.toggle('hidden', e.target.value !== 'custom');
   });
@@ -155,24 +423,83 @@ function renderOnboarding() {
   document.getElementById('settingsForm').addEventListener('submit', (e) => {
     e.preventDefault();
     state.settings = {
+      ...state.settings,
       apiKey: document.getElementById('apiKey').value,
       targetLanguage: document.getElementById('targetLanguage').value,
       stylePreset: document.getElementById('stylePreset').value,
       customStylePrompt: document.getElementById('customStylePrompt') ? document.getElementById('customStylePrompt').value : '',
-      level: 'beginner'
     };
     saveSettings(state.settings);
     state.view = 'home'; render();
   });
 }
 
+// Helper buat handle Custom Assets
+window.applyMascotAsset = (val) => {
+  if (val.trim() === '') return;
+  state.settings.customAssets.mascot = val;
+  saveSettings(state.settings);
+  updateMascotVisuals(); // Langsung update tampilan
+};
+
+window.applyAchievementAsset = (id, val) => {
+  if (val.trim() !== '') {
+    state.settings.customAssets.achievements[id] = val;
+  } else {
+    delete state.settings.customAssets.achievements[id];
+  }
+  saveSettings(state.settings);
+};
+
+window.handleFileUpload = (e, type) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 1024 * 1024) { alert("File kegedean! Maksimal 1MB."); return; }
+  
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    if (type === 'mascot') {
+      state.settings.customAssets.mascot = ev.target.result;
+      saveSettings(state.settings);
+      updateMascotVisuals();
+      alert('Maskot berhasil diupload!');
+    }
+  };
+  reader.readAsDataURL(file);
+};
+
 // --- HOME SCREEN ---
 function renderHome() {
   if (state.progress.lastPlayedDate !== getTodayString()) state.progress.todayXp = 0;
   const hasMistakes = state.progress.mistakes && state.progress.mistakes.length > 0;
   
+  // Render Medali
+  const medaliHtml = ACHIEVEMENTS.map(ach => {
+    const isUnlocked = state.progress.unlockedAchievements.includes(ach.id);
+    const customIcon = state.settings.customAssets.achievements[ach.id];
+    
+    let iconHtml = isUnlocked ? `<span class="text-3xl">${ach.icon}</span>` : `<span class="text-3xl opacity-30 grayscale">${ach.icon}</span>`;
+    if (isUnlocked && customIcon) {
+      if (customIcon.startsWith('http') || customIcon.startsWith('data:image')) {
+        iconHtml = `<img src="${customIcon}" class="w-10 h-10 object-contain drop-shadow-sm" />`;
+      } else {
+        iconHtml = `<span class="text-3xl">${customIcon}</span>`;
+      }
+    }
+
+    return `
+      <div class="flex-shrink-0 w-20 flex flex-col items-center">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center mb-1 ${isUnlocked ? 'bg-yellow-50 border-2 border-yellow-200 shadow-[0_0_15px_rgba(251,191,36,0.3)]' : 'bg-slate-100 border-2 border-slate-200'}">
+          ${iconHtml}
+        </div>
+        <p class="text-[10px] font-bold text-center leading-tight ${isUnlocked ? 'text-slate-700' : 'text-slate-400'}">${ach.title}</p>
+      </div>
+    `;
+  }).join('');
+
   appDiv.innerHTML = `
     <div class="flex-1 flex flex-col p-5 max-w-md mx-auto w-full pb-8 pt-16">
+      
       <div class="flex gap-3 mb-6">
         <div class="flex-1 bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col items-center justify-center">
           <svg width="20" height="20" class="text-orange-500 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
@@ -188,8 +515,8 @@ function renderHome() {
 
       <!-- Topik Custom -->
       <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
-        <label class="block text-sm font-bold text-slate-700 mb-2">Mau belajar apa hari ini? (Opsional)</label>
-        <input type="text" id="topicInput" value="${state.customTopic}" placeholder="Misal: Makanan, Past Tense, atau Liburan..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent mb-3" />
+        <label class="block text-sm font-bold text-slate-700 mb-2">Mau belajar apa hari ini?</label>
+        <input type="text" id="topicInput" value="${state.customTopic}" placeholder="Misal: Makanan, Past Tense..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent mb-3" />
         <button id="btnStartCustom" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-lg py-3 rounded-xl">
           MULAI BELAJAR
         </button>
@@ -197,7 +524,7 @@ function renderHome() {
 
       <!-- Smart Review -->
       ${hasMistakes ? `
-        <div class="bg-red-50 rounded-2xl p-4 shadow-sm border-2 border-red-100 mb-4 animate-slide-up">
+        <div class="bg-red-50 rounded-2xl p-4 shadow-sm border-2 border-red-100 mb-6 animate-slide-up">
           <div class="flex items-center gap-3 mb-3">
             <div class="bg-red-200 text-red-600 p-2 rounded-lg"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
             <div>
@@ -210,6 +537,14 @@ function renderHome() {
           </button>
         </div>
       ` : ''}
+
+      <!-- Achievements Grid -->
+      <div class="mt-2 mb-8">
+        <h3 class="text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Pencapaian</h3>
+        <div class="flex gap-4 overflow-x-auto hide-scrollbar pb-2">
+          ${medaliHtml}
+        </div>
+      </div>
 
       <div class="text-center mt-auto pt-4">
         <button id="btnSettings" class="text-sm font-bold text-slate-400 hover:text-slate-700">⚙️ Pengaturan</button>
@@ -229,8 +564,7 @@ function renderHome() {
       state.view = 'lesson'; state.exercises = []; state.currentIndex = 0; state.correctCount = 0; state.error = ''; render();
     });
   }
-
-  document.getElementById('btnSettings').addEventListener('click', () => { state.view = 'settings'; render(); });
+  document.getElementById('btnSettings').addEventListener('click', () => { state.view = 'settings'; state.settingsTab = 'general'; render(); });
 }
 
 // --- LESSON SCREEN ---
@@ -247,7 +581,9 @@ function renderLesson() {
       <div id="lessonContent" class="flex-1 flex flex-col justify-start pb-12"></div>
     </div>
   `;
-  document.getElementById('btnBack').addEventListener('click', () => { state.view = 'home'; render(); });
+  document.getElementById('btnBack').addEventListener('click', () => { 
+    state.view = 'home'; triggerMascot('idle'); render(); 
+  });
   renderLessonContent();
 }
 
@@ -271,7 +607,6 @@ function renderLessonContent() {
       <div class="flex flex-col items-center justify-center mt-20">
         <div class="w-16 h-16 border-4 border-slate-200 border-t-accent rounded-full animate-spin mb-6"></div>
         <p class="font-bold text-accent text-lg animate-pulse">Meracik soal...</p>
-        <p class="text-xs text-slate-400 mt-2">Cek terminal di kiri atas buat liat prosesnya.</p>
       </div>
     `;
     return;
@@ -300,7 +635,7 @@ function renderLessonContent() {
   const feedbackHtml = state.isAnswered ? `
     <div class="mt-6 p-5 rounded-2xl animate-slide-up ${state.isCorrect ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'}">
       <p class="font-black text-xl mb-2 flex items-center gap-2 ${state.isCorrect ? 'text-success' : 'text-error'}">
-        ${state.isCorrect ? '🎉 Keren Banget!' : '💡 Catat, ini salah!'}
+        ${state.isCorrect ? '🎉 Keren Banget!' : '💡 Belajar Lagi Ya!'}
       </p>
       ${!state.isCorrect ? `<p class="font-bold mb-2 text-slate-800">Jawaban benar: <span class="text-success">${q.correctAnswer}</span></p>` : ''}
       <p class="text-sm font-medium text-slate-600 leading-relaxed">${q.explanation}</p>
@@ -362,16 +697,22 @@ function renderLessonContent() {
 }
 
 async function generateExercises() {
-  state.loading = true; state.error = ''; renderLessonContent();
+  state.loading = true; state.error = ''; 
+  triggerMascot('thinking'); // Animasi Thinking
+  renderLessonContent();
+  
   try {
-    // Tentukan mau pake mistakes atau topik custom
-    const useMistakes = state.isReviewMode ? state.progress.mistakes.slice(-10) : []; // Max 10 kesalahan terakhir biar ga terlalu panjang
+    const useMistakes = state.isReviewMode ? state.progress.mistakes.slice(-10) : [];
     const useTopic = state.isReviewMode ? '' : state.customTopic;
 
     const result = await fetchWithFallback(generatePrompt(state.settings, useTopic, useMistakes), state.settings.apiKey);
-    state.exercises = result; state.currentIndex = 0; state.loading = false; renderLessonContent();
+    state.exercises = result; state.currentIndex = 0; state.loading = false; 
+    triggerMascot('idle'); // Balik idle
+    renderLessonContent();
   } catch (err) {
-    state.error = err.message; state.loading = false; renderLessonContent();
+    state.error = err.message; state.loading = false; 
+    triggerMascot('fail'); // Animasi Fail
+    renderLessonContent();
   }
 }
 
@@ -395,17 +736,18 @@ function handleCheck() {
     state.correctCount++;
     state.progress.xp += 10;
     state.progress.todayXp += 10;
+    triggerMascot('success'); // Animasi Success
     
-    // Kalau lagi di mode Review dan jawab bener, HAPUS dari daftar mistakes
+    // Kalau di Review Mode & bener, hitung healed
     if (state.isReviewMode) {
       state.progress.mistakes = state.progress.mistakes.filter(m => m.question !== q.question);
+      state.progress.healedMistakes = (state.progress.healedMistakes || 0) + 1;
     }
   } else {
-    // Kalau SALAH, masukin ke daftar mistakes (kalau belum ada)
+    triggerMascot('fail'); // Animasi Fail
     const isExist = state.progress.mistakes.find(m => m.question === q.question);
     if (!isExist) {
       state.progress.mistakes.push({ question: q.question, correctAnswer: q.correctAnswer });
-      // Batasi maksimal 30 kesalahan biar localStorage ga bengkak
       if (state.progress.mistakes.length > 30) state.progress.mistakes.shift();
     }
   }
@@ -420,6 +762,12 @@ function handleNext() {
     state.currentIndex++; state.typedAnswer = ''; state.selectedOption = null; state.isAnswered = false; state.isCorrect = false; renderLessonContent();
   } else {
     updateStreak(); 
+    state.progress.sessionsCompleted = (state.progress.sessionsCompleted || 0) + 1;
+    saveProgress(state.progress);
+    
+    // Cek Achievements di akhir sesi
+    checkAchievements(state.correctCount, state.exercises.length);
+    
     state.view = 'summary'; 
     render();
   }
@@ -464,7 +812,7 @@ function renderSummary() {
   `;
 
   document.getElementById('btnFinish').addEventListener('click', () => {
-    state.view = 'home'; render();
+    state.view = 'home'; triggerMascot('idle'); render();
   });
 }
 
