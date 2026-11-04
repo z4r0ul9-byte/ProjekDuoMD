@@ -85,57 +85,68 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
     "prompt": "Translate to ${settings.targetLanguage}",
     "correctAnswer": "I like eating apples",
     "explanation": "Penjelasan kenapa jawabannya itu..."
-  },
-  {
-    "type": "grammar",
-    "question": "Which one is correct?",
-    "options": ["He go to school", "He goes to school", "He going to school", "He gone to school"],
-    "correctAnswer": "He goes to school",
-    "explanation": "Penjelasan singkat..."
   }
 ]`;
     };
 
-    // --- GEMINI API FETCH WITH FALLBACK ---
-    // Daftar model dari yang paling pinter ke yang paling stabil
+    // --- GEMINI API FETCH WITH RETRY & FALLBACK ---
+    // Mengutamakan model yang lebih stabil, bukan yang terbaru.
     const FALLBACK_MODELS = [
-      'gemini-3.8-flash',
-      'gemini-3.6-flash',
-      'gemini-flash-latest'
+      'gemini-3.6-flash',    // Paling stabil untuk free tier
+      'gemini-3.1-flash-lite', // Alternatif ringan jika 3.6 penuh
+      'gemini-3.8-flash'     // Model terbaru (paling sering 503)
     ];
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     const fetchWithFallback = async (prompt, apiKey) => {
       let lastError = null;
-      
-      for (const model of FALLBACK_MODELS) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: "application/json" }
-            })
-          });
 
-          if (res.ok) {
-            const json = await res.json();
-            const rawText = json.candidates[0].content.parts[0].text;
-            return JSON.parse(rawText); // Sukses, kembalikan data
-          } else {
+      for (const model of FALLBACK_MODELS) {
+        // Coba maksimal 3 kali untuk setiap model dengan jeda (exponential backoff)
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+              })
+            });
+
+            if (res.ok) {
+              const json = await res.json();
+              const rawText = json.candidates[0].content.parts[0].text;
+              return JSON.parse(rawText); // Sukses
+            } 
+            
             const errData = await res.json();
-            lastError = new Error(errData.error?.message || `Gagal di ${model}`);
-            console.warn(`Model ${model} gagal: ${lastError.message}. Mencoba fallback...`);
-            // Lanjut ke model berikutnya di loop
+            const errorMsg = errData.error?.message || "";
+            
+            // Jika error 503 (High Demand) atau 429 (Rate Limit), tunggu lalu coba lagi
+            if (res.status === 503 || res.status === 429) {
+              lastError = new Error(`Model ${model} sibuk (${res.status}).`);
+              // Jeda: 2 detik, lalu 4 detik
+              await sleep(attempt * 2000); 
+              continue; // Lanjut ke percobaan berikutnya
+            } 
+            
+            // Jika error lain (misal 400/403), langsung lempar error
+            throw new Error(errorMsg || `Gagal dengan status ${res.status}`);
+
+          } catch (err) {
+            lastError = err;
+            // Jika ini error jaringan, tunggu sebentar sebelum mencoba model berikutnya
+            if (attempt === 3) break; 
+            await sleep(1000);
           }
-        } catch (err) {
-          lastError = err;
-          console.warn(`Network error di ${model}: ${err.message}. Mencoba fallback...`);
         }
+        // Jika 3 percobaan untuk model ini gagal, lanjut ke model berikutnya di daftar
+        console.warn(`Model ${model} gagal setelah 3 percobaan. Beralih ke model berikutnya.`);
       }
       
-      // Kalau semua model di daftar udah dicoba dan gagal semua
-      throw new Error(`Semua model sedang sibuk. Error terakhir: ${lastError?.message}`);
+      throw new Error(`Semua model sedang sibuk atau tidak tersedia. Error terakhir: ${lastError?.message}`);
     };
 
     // --- COMPONENTS ---
@@ -263,13 +274,13 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
                 </button>
               )}
 
-              {loading && <p className="text-accent animate-pulse text-sm">Menghubungi Gemini... (Mencari server yang siap)</p>}
+              {loading && <p className="text-accent animate-pulse text-sm">Menghubungi Gemini... (Mencari server yang siap & mencoba ulang jika sibuk)</p>}
               
               {error && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-200">
                   <strong>Error:</strong> {error}
                   <br/><br/>
-                  Kalau ini terus muncul, coba lagi beberapa saat atau pastikan kuota free tier kamu masih ada.
+                  Jika masih gagal, berarti semua server Google memang sedang penuh. Tunggu 1-2 menit lalu coba lagi.
                 </div>
               )}
 
