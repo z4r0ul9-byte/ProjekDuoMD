@@ -110,7 +110,6 @@ const fetchAI = async (prompt, settings) => {
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey || 'ollama'}`,
-          // HEADER TAMBAHAN UNTUK OPENROUTER
           'HTTP-Referer': window.location.href, 
           'X-Title': 'LinguaQuest'
         },
