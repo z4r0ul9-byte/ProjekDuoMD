@@ -32,11 +32,19 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
 const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper buat ngirim log ke UI
+const log = (msg, type = 'info') => {
+  if (typeof window.addLog === 'function') window.addLog(msg, type);
+};
+
 const fetchWithFallback = async (prompt, apiKey) => {
   let lastError = null;
+  
   for (const model of FALLBACK_MODELS) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
+        log(`Mencoba model: ${model} (Attempt ${attempt})`, 'accent');
+        
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -45,22 +53,33 @@ const fetchWithFallback = async (prompt, apiKey) => {
             generationConfig: { responseMimeType: "application/json" }
           })
         });
+        
         if (res.ok) {
           const json = await res.json();
+          log(`Berhasil dapet soal dari ${model}!`, 'success');
           return JSON.parse(json.candidates[0].content.parts[0].text);
         }
+        
         const errData = await res.json();
+        
         if (res.status === 503 || res.status === 429) {
           lastError = new Error(`Model ${model} sibuk.`);
-          await sleep(attempt * 2000); continue;
+          log(`Error ${res.status} (High Demand). Nunggu ${attempt * 2} detik...`, 'error');
+          await sleep(attempt * 2000); 
+          continue;
         }
+        
         throw new Error(errData.error?.message || "Gagal");
       } catch (err) {
         lastError = err;
+        log(`Gagal di ${model}: ${err.message}`, 'error');
         if (attempt === 2) break;
         await sleep(1000);
       }
     }
+    log(`Beralih dari model ${model} karena gagal...`, 'error');
   }
+  
+  log(`Semua model gagal.`, 'error');
   throw new Error(`Semua server sibuk: ${lastError?.message}`);
 };
