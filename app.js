@@ -5,7 +5,7 @@ let state = {
   progress: loadProgress(),
   exercises: [],
   currentIndex: 0,
-  correctCount: 0, // Ngetrack bener berapa
+  correctCount: 0,
   loading: false,
   error: '',
   isAnswered: false,
@@ -17,12 +17,8 @@ let state = {
 const appDiv = document.getElementById('app');
 
 function init() {
-  // Cek apakah hari ini udah main, buat reset todayXp
   const today = getTodayString();
-  if (state.progress.lastPlayedDate !== today) {
-    state.progress.todayXp = 0;
-  }
-
+  if (state.progress.lastPlayedDate !== today) state.progress.todayXp = 0;
   if (state.settings.apiKey) state.view = 'home';
   else state.view = 'onboarding';
   render();
@@ -36,46 +32,41 @@ function render() {
   else if (state.view === 'summary') renderSummary();
 }
 
-// --- FUNGSI HITUNG STREAK ---
 function updateStreak() {
   const today = getTodayString();
   const lastPlayed = state.progress.lastPlayedDate;
-  
   if (lastPlayed !== today) {
-    // Cek apakah kemarin main
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
-
-    if (lastPlayed === yesterdayStr) {
-      state.progress.streak += 1; // Lanjut streak
-    } else {
-      state.progress.streak = 1; // Reset ke 1 karena bolong
-    }
+    if (lastPlayed === yesterdayStr) state.progress.streak += 1;
+    else state.progress.streak = 1;
     state.progress.lastPlayedDate = today;
   }
-  // Kalau lastPlayed === today, streak ga nambah (baru selesai 1 sesi hari ini)
   saveProgress(state.progress);
 }
 
-// --- VIEWS ---
+// --- ONBOARDING / SETTINGS ---
 function renderOnboarding() {
-  // SAMA SEPERTI SEBELUMNYA
   appDiv.innerHTML = `
     <div class="flex-1 flex items-center justify-center p-4">
-      <div class="lq-fade-in max-w-md w-full bg-surface rounded-2xl border border-border shadow-sm p-6">
-        <div class="text-center mb-6">
-          <h1 class="text-2xl font-bold text-ink">${state.view === 'settings' ? 'Pengaturan' : 'Selamat Datang'}</h1>
-        </div>
-        <form id="settingsForm" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-ink mb-1">Gemini API Key</label>
-            <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+      <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-8">
+        <div class="text-center mb-8">
+          <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 text-accent rounded-2xl mb-4 shadow-inner-light">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">${state.view === 'settings' ? 'Pengaturan' : 'LinguaQuest'}</h1>
+          <p class="text-slate-500 font-medium mt-1">Belajar bahasa, gaya kamu sendiri.</p>
+        </div>
+        <form id="settingsForm" class="space-y-5">
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Gemini API Key</label>
+            <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent focus:bg-white transition-colors" placeholder="AIzaSy..." />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-ink mb-1">Bahasa Target</label>
-              <select id="targetLanguage" class="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white">
+              <label class="block text-sm font-bold text-slate-700 mb-2">Bahasa Target</label>
+              <select id="targetLanguage" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent appearance-none cursor-pointer">
                 <option ${state.settings.targetLanguage === 'English' ? 'selected' : ''}>English</option>
                 <option ${state.settings.targetLanguage === 'Japanese' ? 'selected' : ''}>Japanese</option>
                 <option ${state.settings.targetLanguage === 'Korean' ? 'selected' : ''}>Korean</option>
@@ -84,19 +75,21 @@ function renderOnboarding() {
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-ink mb-1">Gaya Mengajar</label>
-              <select id="stylePreset" class="w-full px-3 py-2 border border-border rounded-lg text-sm bg-white">
+              <label class="block text-sm font-bold text-slate-700 mb-2">Gaya</label>
+              <select id="stylePreset" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent appearance-none cursor-pointer">
                 <option value="santuy" ${state.settings.stylePreset === 'santuy' ? 'selected' : ''}>Santuy</option>
                 <option value="gaul" ${state.settings.stylePreset === 'gaul' ? 'selected' : ''}>Gaul</option>
                 <option value="formal" ${state.settings.stylePreset === 'formal' ? 'selected' : ''}>Formal</option>
-                <option value="custom" ${state.settings.stylePreset === 'custom' ? 'selected' : ''}>Custom...</option>
+                <option value="custom" ${state.settings.stylePreset === 'custom' ? 'selected' : ''}>Custom</option>
               </select>
             </div>
           </div>
           <div id="customStyleContainer" class="${state.settings.stylePreset === 'custom' ? 'block' : 'hidden'}">
-            <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Prompt custom..." class="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+            <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" />
           </div>
-          <button type="submit" class="w-full bg-accent text-white font-medium py-2.5 rounded-lg mt-2">Simpan</button>
+          <button type="submit" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3.5 rounded-2xl mt-4">
+            Simpan & Lanjut
+          </button>
         </form>
       </div>
     </div>
@@ -120,43 +113,49 @@ function renderOnboarding() {
   });
 }
 
+// --- HOME SCREEN ---
 function renderHome() {
-  // Update todayXp kalau hari udah berubah
-  if (state.progress.lastPlayedDate !== getTodayString()) {
-    state.progress.todayXp = 0;
-  }
-
-  const fireColor = state.progress.streak > 0 ? 'text-orange-500' : 'text-gray-300';
-
+  if (state.progress.lastPlayedDate !== getTodayString()) state.progress.todayXp = 0;
+  
   appDiv.innerHTML = `
-    <div class="flex-1 flex flex-col p-4 max-w-md mx-auto w-full">
-      <!-- Header: Streak & XP -->
-      <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-border shadow-sm mb-8 mt-4">
-        <div class="flex items-center gap-2">
-          <svg class="${fireColor} w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
+    <div class="flex-1 flex flex-col p-5 max-w-md mx-auto w-full pb-8">
+      <!-- Top Bar (Stats) -->
+      <div class="flex gap-4 mb-8 mt-2">
+        <div class="flex-1 bg-white rounded-2xl p-4 shadow-premium border border-slate-100 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 animate-pop">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
+          </div>
           <div>
-            <p class="text-xs text-ink-muted font-bold uppercase">Streak</p>
-            <p class="text-xl font-black text-ink leading-none">${state.progress.streak} Hari</p>
+            <p class="text-xs text-slate-400 font-extrabold uppercase tracking-wider">Streak</p>
+            <p class="text-xl font-black text-slate-800 leading-none">${state.progress.streak} <span class="text-sm font-bold text-slate-500">Hari</span></p>
           </div>
         </div>
-        <div class="text-right">
-          <p class="text-xs text-accent font-bold uppercase">Total XP</p>
-          <p class="text-xl font-black text-accent leading-none">${state.progress.xp} XP</p>
+        <div class="flex-1 bg-white rounded-2xl p-4 shadow-premium border border-slate-100 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-500">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
+          <div>
+            <p class="text-xs text-slate-400 font-extrabold uppercase tracking-wider">Total XP</p>
+            <p class="text-xl font-black text-slate-800 leading-none">${state.progress.xp}</p>
+          </div>
         </div>
       </div>
 
-      <!-- Ilustrasi / Sapaan -->
-      <div class="text-center flex-1 flex flex-col justify-center">
-        <h1 class="text-3xl font-bold text-ink mb-2">Siap Belajar?</h1>
-        <p class="text-ink-muted mb-8 text-sm">${state.settings.targetLanguage} • Gaya ${state.settings.stylePreset}</p>
+      <!-- Hero Section -->
+      <div class="flex-1 flex flex-col justify-center text-center items-center">
+        <div class="w-32 h-32 bg-indigo-50 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner-light rotate-3">
+           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="-rotate-3"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+        </div>
+        <h1 class="text-3xl font-black text-slate-800 mb-3 tracking-tight">Siap Taklukkan<br>${state.settings.targetLanguage}?</h1>
+        <p class="text-slate-500 font-medium mb-8 px-4">Latihan 5 soal tiap hari buat jaga streak kamu.</p>
         
-        <button id="btnStart" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-4 rounded-xl transition-all shadow-[0_4px_14px_0_rgba(77,107,254,0.39)] active:scale-95 text-lg">
-          Mulai Latihan
+        <button id="btnStart" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-xl py-4 rounded-2xl tracking-wide shadow-lg">
+          MULAI BELAJAR
         </button>
       </div>
 
       <div class="text-center mt-6">
-        <button id="btnSettings" class="text-sm font-medium text-ink-muted hover:text-ink">Pengaturan</button>
+        <button id="btnSettings" class="text-sm font-bold text-slate-400 hover:text-slate-700 transition-colors bg-slate-200/50 px-4 py-2 rounded-full">⚙️ Pengaturan</button>
       </div>
     </div>
   `;
@@ -167,12 +166,16 @@ function renderHome() {
   document.getElementById('btnSettings').addEventListener('click', () => { state.view = 'settings'; render(); });
 }
 
+// --- LESSON SCREEN ---
 function renderLesson() {
-  // SAMA SEPERTI SEBELUMNYA
   appDiv.innerHTML = `
-    <div class="flex-1 flex flex-col p-4 pt-6 min-h-screen max-w-lg mx-auto w-full">
-      <button id="btnBack" class="text-sm font-medium text-ink-muted mb-4 self-start">&larr; Keluar</button>
-      <div id="lessonContent" class="flex-1 flex flex-col justify-center pb-12"></div>
+    <div class="flex-1 flex flex-col p-5 min-h-screen max-w-lg mx-auto w-full">
+      <div class="flex items-center mb-8">
+        <button id="btnBack" class="text-slate-400 hover:text-slate-700 p-2 -ml-2 rounded-full bg-slate-200/50">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+      </div>
+      <div id="lessonContent" class="flex-1 flex flex-col justify-start pb-12"></div>
     </div>
   `;
   document.getElementById('btnBack').addEventListener('click', () => { state.view = 'home'; render(); });
@@ -180,15 +183,14 @@ function renderLesson() {
 }
 
 function renderLessonContent() {
-  // SAMA SEPERTI SEBELUMNYA (Hanya tambah logika update correctCount)
   const contentDiv = document.getElementById('lessonContent');
   if (!contentDiv) return;
 
   if (!state.exercises.length && !state.loading) {
     contentDiv.innerHTML = `
-      <div class="text-center">
-        ${state.error ? `<div class="bg-red-50 text-red-600 p-4 rounded-xl mb-4 text-sm font-medium border border-red-200">${state.error}</div>` : ''}
-        <button id="btnGenerate" class="bg-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-md">Generate 5 Soal Sekarang</button>
+      <div class="text-center mt-10">
+        ${state.error ? `<div class="bg-red-50 text-error p-4 rounded-xl mb-6 text-sm font-bold border-2 border-red-100">${state.error}</div>` : ''}
+        <button id="btnGenerate" class="w-full btn-3d bg-accent border-accent-dark text-white font-black text-lg py-4 rounded-2xl tracking-wide">Generate Soal AI</button>
       </div>
     `;
     document.getElementById('btnGenerate').addEventListener('click', generateExercises);
@@ -196,7 +198,12 @@ function renderLessonContent() {
   }
 
   if (state.loading) {
-    contentDiv.innerHTML = `<p class="text-center font-medium text-accent animate-pulse">Menyiapkan soal dari AI...</p>`;
+    contentDiv.innerHTML = `
+      <div class="flex flex-col items-center justify-center mt-20">
+        <div class="w-16 h-16 border-4 border-slate-200 border-t-accent rounded-full animate-spin mb-6"></div>
+        <p class="font-bold text-accent text-lg animate-pulse">Meracik soal...</p>
+      </div>
+    `;
     return;
   }
 
@@ -206,48 +213,64 @@ function renderLessonContent() {
   let inputHtml = '';
   if (q.options) {
     inputHtml = q.options.map(opt => {
-      let btnClass = 'border-border bg-white text-ink hover:bg-surface-alt';
-      if (state.isAnswered && opt === q.correctAnswer) btnClass = 'border-success bg-green-50 text-success';
-      else if (state.isAnswered && opt === state.selectedOption && !state.isCorrect) btnClass = 'border-error bg-red-50 text-error';
-      else if (state.selectedOption === opt) btnClass = 'border-accent bg-accent-soft text-accent';
-      return `<button class="option-btn w-full text-left px-4 py-3 rounded-xl border-2 transition-all font-medium ${btnClass}" data-opt="${opt}" ${state.isAnswered ? 'disabled' : ''}>${opt}</button>`;
+      let btnClass = 'border-slate-200 bg-white text-slate-700 border-b-4 active:border-b-0 active:mt-1';
+      if (state.isAnswered && opt === q.correctAnswer) btnClass = 'border-success bg-green-50 text-success border-b-0 mt-1';
+      else if (state.isAnswered && opt === state.selectedOption && !state.isCorrect) btnClass = 'border-error bg-red-50 text-error border-b-0 mt-1';
+      else if (state.selectedOption === opt) btnClass = 'border-accent bg-indigo-50 text-accent';
+      
+      return `<button class="option-btn w-full text-left px-5 py-4 rounded-2xl border-2 font-bold text-lg transition-all mb-3 ${btnClass}" data-opt="${opt}" ${state.isAnswered ? 'disabled' : ''}>${opt}</button>`;
     }).join('');
   } else {
-    let inputClass = 'border-border focus:border-accent';
-    if (state.isAnswered && state.isCorrect) inputClass = 'border-success bg-green-50';
-    else if (state.isAnswered && !state.isCorrect) inputClass = 'border-error bg-red-50';
-    inputHtml = `<input type="text" id="textAnswer" value="${state.typedAnswer}" placeholder="Ketik jawabanmu di sini..." class="w-full px-4 py-3 rounded-xl border-2 text-lg outline-none transition-all ${inputClass}" ${state.isAnswered ? 'disabled' : ''} autocomplete="off">`;
+    let inputClass = 'border-slate-200 bg-white focus:border-accent focus:ring-4 focus:ring-indigo-100';
+    if (state.isAnswered && state.isCorrect) inputClass = 'border-success bg-green-50 text-success';
+    else if (state.isAnswered && !state.isCorrect) inputClass = 'border-error bg-red-50 text-error';
+    inputHtml = `<input type="text" id="textAnswer" value="${state.typedAnswer}" placeholder="Ketik jawaban..." class="w-full px-5 py-4 rounded-2xl border-2 font-bold text-lg outline-none transition-all ${inputClass}" ${state.isAnswered ? 'disabled' : ''} autocomplete="off" autofocus>`;
   }
 
   const feedbackHtml = state.isAnswered ? `
-    <div class="mt-6 p-4 rounded-xl border ${state.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} lq-fade-in">
-      <p class="font-bold mb-1 ${state.isCorrect ? 'text-success' : 'text-error'}">${state.isCorrect ? '✅ Benar! (+10 XP)' : '❌ Salah, jawaban yang bener:'}</p>
-      ${!state.isCorrect ? `<p class="font-medium mb-2 text-ink">${q.correctAnswer}</p>` : ''}
-      <p class="text-sm text-ink-muted">${q.explanation}</p>
+    <div class="mt-6 p-5 rounded-2xl animate-slide-up ${state.isCorrect ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'}">
+      <p class="font-black text-xl mb-2 flex items-center gap-2 ${state.isCorrect ? 'text-success' : 'text-error'}">
+        ${state.isCorrect ? '🎉 Keren Banget!' : '💡 Belajar Lagi Ya!'}
+      </p>
+      ${!state.isCorrect ? `<p class="font-bold mb-2 text-slate-800">Jawaban benar: <span class="text-success">${q.correctAnswer}</span></p>` : ''}
+      <p class="text-sm font-medium text-slate-600 leading-relaxed">${q.explanation}</p>
     </div>
   ` : '';
 
   const actionBtnHtml = !state.isAnswered ? `
-    <button id="btnCheck" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-50 disabled:hover:bg-accent" ${(!state.typedAnswer && !state.selectedOption) ? 'disabled' : ''}>Cek Jawaban</button>
+    <button id="btnCheck" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-lg py-4 rounded-2xl tracking-wide mt-8 disabled:opacity-50 disabled:pointer-events-none" ${(!state.typedAnswer && !state.selectedOption) ? 'disabled' : ''}>CEK JAWABAN</button>
   ` : `
-    <button id="btnNext" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl transition-colors lq-fade-in">${state.currentIndex === state.exercises.length - 1 ? 'Selesaikan Latihan' : 'Lanjut Soal Berikutnya'}</button>
+    <button id="btnNext" class="w-full btn-3d ${state.isCorrect ? 'bg-success border-success-dark hover:bg-emerald-600' : 'bg-error border-error-dark hover:bg-red-600'} text-white font-black text-lg py-4 rounded-2xl tracking-wide mt-6 animate-slide-up">${state.currentIndex === state.exercises.length - 1 ? 'SELESAIKAN' : 'LANJUT'}</button>
   `;
 
   contentDiv.innerHTML = `
     <div class="w-full">
-      <div class="w-full bg-border rounded-full h-2 mb-6"><div class="bg-accent h-2 rounded-full transition-all" style="width: ${progress}%"></div></div>
-      <div class="mb-8">
-        <p class="text-sm font-bold text-accent mb-2 uppercase tracking-wide">${q.type.replace('-', ' ')}</p>
-        ${q.type === 'listening' ? `
-          <button id="btnPlayAudio" class="w-20 h-20 bg-accent text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg hover:bg-blue-600 transition-transform active:scale-95">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
-          </button>
-        ` : `<h2 class="text-xl sm:text-2xl font-bold text-ink leading-tight">${q.question}</h2>`}
-        ${q.prompt ? `<p class="text-ink-muted mt-2 text-sm">${q.prompt}</p>` : ''}
+      <!-- Progress -->
+      <div class="flex items-center gap-3 mb-8">
+        <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden shadow-inner">
+          <div class="bg-accent h-full rounded-full transition-all duration-500 ease-out" style="width: ${progress}%"></div>
+        </div>
+        <span class="text-sm font-black text-slate-400">${state.currentIndex + 1}/${state.exercises.length}</span>
       </div>
-      <div class="space-y-3">${inputHtml}</div>
+
+      <div class="mb-8">
+        <span class="inline-block bg-indigo-100 text-accent text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-4">${q.type.replace('-', ' ')}</span>
+        
+        ${q.type === 'listening' ? `
+          <div class="flex flex-col items-center justify-center py-6 bg-slate-50 rounded-3xl border-2 border-slate-100 mb-2">
+            <button id="btnPlayAudio" class="w-24 h-24 bg-accent text-white rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-600 transition-transform active:scale-95 border-b-4 border-accent-dark active:border-b-0 active:mt-1">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+            </button>
+            <p class="mt-4 text-sm font-bold text-slate-400">Tap buat dengerin</p>
+          </div>
+        ` : `<h2 class="text-2xl sm:text-3xl font-black text-slate-800 leading-tight">${q.question}</h2>`}
+        
+        ${q.prompt ? `<p class="text-slate-500 font-medium mt-3 text-lg">${q.prompt}</p>` : ''}
+      </div>
+
+      <div class="space-y-1">${inputHtml}</div>
       ${feedbackHtml}
-      <div class="mt-8">${actionBtnHtml}</div>
+      <div>${actionBtnHtml}</div>
     </div>
   `;
 
@@ -258,87 +281,51 @@ function renderLessonContent() {
     });
   } else {
     const input = document.getElementById('textAnswer');
-    input.addEventListener('input', (e) => { state.typedAnswer = e.target.value; document.getElementById('btnCheck').disabled = !state.typedAnswer; });
+    input.addEventListener('input', (e) => { 
+      state.typedAnswer = e.target.value; 
+      const btn = document.getElementById('btnCheck');
+      if(btn) btn.disabled = !state.typedAnswer; 
+    });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && state.typedAnswer) handleCheck(); });
   }
   if (!state.isAnswered) document.getElementById('btnCheck').addEventListener('click', handleCheck);
   else document.getElementById('btnNext').addEventListener('click', handleNext);
 }
 
-async function generateExercises() {
-  state.loading = true; state.error = ''; renderLessonContent();
-  try {
-    const result = await fetchWithFallback(generatePrompt(state.settings), state.settings.apiKey);
-    state.exercises = result; state.currentIndex = 0; state.loading = false; renderLessonContent();
-  } catch (err) {
-    state.error = err.message; state.loading = false; renderLessonContent();
-  }
-}
-
-function playTTS(text) {
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = state.settings.targetLanguage === 'English' ? 'en-US' : 'ja-JP'; 
-    window.speechSynthesis.speak(utterance);
-  }
-}
-
-function handleCheck() {
-  const q = state.exercises[state.currentIndex];
-  const userAns = q.options ? state.selectedOption : state.typedAnswer;
-  if (!userAns) return;
-  
-  state.isCorrect = userAns.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
-  
-  if (state.isCorrect) {
-    state.correctCount++;
-    state.progress.xp += 10; // Dapet 10 XP per jawaban bener
-    state.progress.todayXp += 10;
-    saveProgress(state.progress);
-  }
-  
-  state.isAnswered = true;
-  renderLessonContent();
-}
-
-function handleNext() {
-  if (state.currentIndex < state.exercises.length - 1) {
-    state.currentIndex++; state.typedAnswer = ''; state.selectedOption = null; state.isAnswered = false; state.isCorrect = false; renderLessonContent();
-  } else {
-    // Pindah ke layar Summary
-    updateStreak(); 
-    state.view = 'summary'; 
-    render();
-  }
-}
-
-// --- LAYAR SELESAI (SUMMARY) ---
+// --- SUMMARY (SELESAI) ---
 function renderSummary() {
   const xpEarned = state.correctCount * 10;
-  
+  const isPerfect = state.correctCount === state.exercises.length;
+
   appDiv.innerHTML = `
-    <div class="flex-1 flex flex-col p-4 items-center justify-center max-w-md mx-auto w-full">
-      <div class="lq-fade-in text-center w-full">
-        <div class="inline-flex items-center justify-center w-24 h-24 bg-yellow-100 text-yellow-500 rounded-full mb-6 shadow-inner animate-bounce">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    <div class="flex-1 flex flex-col p-5 items-center justify-center max-w-md mx-auto w-full">
+      <div class="animate-slide-up text-center w-full">
+        <div class="inline-flex items-center justify-center w-32 h-32 ${isPerfect ? 'bg-yellow-100 text-yellow-500' : 'bg-indigo-100 text-accent'} rounded-full mb-8 shadow-inner relative">
+          ${isPerfect ? `
+            <svg class="absolute -top-4 -right-2 w-10 h-10 text-yellow-400 animate-bounce" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          ` : ''}
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
         </div>
-        <h1 class="text-3xl font-black text-ink mb-2">Latihan Selesai!</h1>
-        <p class="text-ink-muted mb-8">Lu jawab ${state.correctCount} dari ${state.exercises.length} soal dengan benar.</p>
         
-        <div class="bg-white rounded-2xl border border-border p-6 shadow-sm mb-8 flex justify-around">
+        <h1 class="text-4xl font-black text-slate-800 mb-3 tracking-tight">${isPerfect ? 'SEMPURNA!' : 'Selesai!'}</h1>
+        <p class="text-lg text-slate-500 font-medium mb-10">Lu jawab ${state.correctCount} dari ${state.exercises.length} soal dengan benar.</p>
+        
+        <div class="bg-white rounded-3xl border-2 border-slate-100 p-6 shadow-premium mb-10 flex justify-around">
           <div class="text-center">
-            <p class="text-xs text-ink-muted font-bold uppercase mb-1">Didapat</p>
-            <p class="text-2xl font-black text-accent">+${xpEarned} XP</p>
+            <p class="text-xs text-slate-400 font-extrabold uppercase tracking-widest mb-1">XP Didapat</p>
+            <p class="text-3xl font-black text-accent">+${xpEarned}</p>
           </div>
-          <div class="text-center border-l border-border pl-6">
-            <p class="text-xs text-ink-muted font-bold uppercase mb-1">Streak Lu</p>
-            <p class="text-2xl font-black text-orange-500">${state.progress.streak} Hari</p>
+          <div class="w-px bg-slate-200"></div>
+          <div class="text-center">
+            <p class="text-xs text-slate-400 font-extrabold uppercase tracking-widest mb-1">Streak Lu</p>
+            <p class="text-3xl font-black text-orange-500 flex items-center justify-center gap-1">
+              ${state.progress.streak} <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c0 0-4 4-4 9 0 2.5 1.5 4.5 3 5.5V19h2v-2.5c1.5-1 3-3 3-5.5 0-5-4-9-4-9zm0 15c-1.5 0-3-1.5-3-3 0-2 2-4.5 3-5.5 1 1 3 3.5 3 5.5 0 1.5-1.5 3-3 3z"/></svg>
+            </p>
           </div>
         </div>
 
-        <button id="btnFinish" class="w-full bg-accent hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-md transition-transform active:scale-95 text-lg">
-          Kembali ke Beranda
+        <button id="btnFinish" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-xl py-4 rounded-2xl tracking-wide shadow-lg">
+          KEMBALI KE BERANDA
         </button>
       </div>
     </div>
