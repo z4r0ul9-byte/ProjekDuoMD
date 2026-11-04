@@ -4,36 +4,60 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LinguaQuest</title>
+  <!-- Load Font Nunito -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Nunito', 'system-ui', 'sans-serif'],
+          },
           colors: {
-            accent: '#4d6bfe',
-            'accent-soft': '#eef1ff',
-            ink: '#0d0d0d',
-            'ink-muted': '#6b7280',
-            surface: '#ffffff',
-            'surface-alt': '#fafafa',
-            border: '#e5e5e5',
-            success: '#22c55e',
-            error: '#ef4444',
+            accent: '#4F46E5', // Indigo modern
+            'accent-dark': '#3730A3', // Buat bayangan 3D tombol
+            success: '#10B981',
+            'success-dark': '#047857',
+            error: '#EF4444',
+            'error-dark': '#B91C1C',
+            gold: '#FBBF24',
+            bg: '#F8FAFC',
+          },
+          boxShadow: {
+            'premium': '0 10px 40px -10px rgba(0,0,0,0.08)',
+            'inner-light': 'inset 0 2px 4px 0 rgba(255, 255, 255, 0.3)',
           }
         }
       }
     }
   </script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-    .lq-fade-in { animation: fadeIn 220ms ease-out both; }
+    body { font-family: 'Nunito', sans-serif; }
+    /* Animasi mantul buat icon/feedback */
+    @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    .animate-pop { animation: pop 0.3s ease-in-out; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+    
+    /* Tombol 3D Duolingo style */
+    .btn-3d {
+      transition: all 0.1s ease;
+      border-bottom-width: 4px;
+    }
+    .btn-3d:active {
+      transform: translateY(4px);
+      border-bottom-width: 0px;
+      margin-bottom: 4px;
+    }
   </style>
 </head>
-<body class="bg-surface-alt text-ink antialiased">
+<body class="bg-bg text-slate-800 antialiased">
   <div id="app" class="min-h-screen flex flex-col"></div>
 
-  <!-- Load file JS kita secara berurutan -->
   <script src="storage.js"></script>
   <script src="api.js"></script>
   <script src="app.js"></script>
