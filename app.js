@@ -16,15 +16,16 @@ let state = {
   showLogs: false,
   customTopic: '',
   isReviewMode: false,
-  settingsTab: 'general',
+  settingsTab: 'general', // 'general' | 'custom' | 'memory'
   mascotState: 'idle',
   mascotSpeech: null,
-  showAchievementPopup: null
+  showAchievementPopup: null,
+  // State form memori
+  memoryInput: ''
 };
 
 const appDiv = document.getElementById('app');
 
-// DATA MEDALI
 const ACHIEVEMENTS = [
   { id: 'first_step', title: 'First Step', desc: 'Selesaikan 1 sesi', icon: '🥇' },
   { id: 'perfect', title: 'Perfect!', desc: 'Dapat 5/5', icon: '💯' },
@@ -135,7 +136,6 @@ function updateMascotVisuals() {
   const avatar = document.getElementById('mascotAvatar');
   if (!avatar) return;
   
-  // Ambil asset dari setting (pake optional chaining biar ga error kalau data kosong)
   const asset = state.settings.customAssets?.mascot || '🦉';
   
   avatar.className = 'w-16 h-16 flex items-center justify-center text-5xl drop-shadow-lg';
@@ -157,6 +157,7 @@ function updateMascotVisuals() {
   else if (state.mascotState === 'thinking') avatar.classList.add('mascot-thinking');
   else if (state.mascotState === 'success') avatar.classList.add('mascot-success');
   else if (state.mascotState === 'fail') avatar.classList.add('mascot-fail');
+  else if (state.mascotState === 'wink') avatar.classList.add('mascot-wink');
   
   const bubble = document.getElementById('mascotBubble');
   const text = document.getElementById('mascotText');
@@ -176,7 +177,7 @@ function triggerMascot(stateName) {
     setTimeout(() => {
       state.mascotState = 'idle';
       updateMascotVisuals();
-    }, 2000);
+    }, 1500);
   }
 }
 
@@ -285,40 +286,42 @@ function updateStreak() {
 // --- ONBOARDING / SETTINGS ---
 function renderOnboarding() {
   let generalContent = `
-    <form id="settingsForm" class="space-y-4">
-      <div>
-        <label class="block text-sm font-bold text-slate-700 mb-1">Gemini API Key</label>
-        <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" />
-      </div>
-      <div class="grid grid-cols-2 gap-3">
+    <div class="animate-slide-in-right">
+      <form id="settingsForm" class="space-y-4">
         <div>
-          <label class="block text-sm font-bold text-slate-700 mb-1">Bahasa</label>
-          <select id="targetLanguage" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
-            <option ${state.settings.targetLanguage === 'English' ? 'selected' : ''}>English</option>
-            <option ${state.settings.targetLanguage === 'Japanese' ? 'selected' : ''}>Japanese</option>
-            <option ${state.settings.targetLanguage === 'Korean' ? 'selected' : ''}>Korean</option>
-            <option ${state.settings.targetLanguage === 'Spanish' ? 'selected' : ''}>Spanish</option>
-          </select>
+          <label class="block text-sm font-bold text-slate-700 mb-1">Gemini API Key</label>
+          <input type="password" id="apiKey" required value="${state.settings.apiKey}" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" />
         </div>
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-1">Gaya</label>
-          <select id="stylePreset" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
-            <option value="santuy" ${state.settings.stylePreset === 'santuy' ? 'selected' : ''}>Santuy</option>
-            <option value="gaul" ${state.settings.stylePreset === 'gaul' ? 'selected' : ''}>Gaul</option>
-            <option value="formal" ${state.settings.stylePreset === 'formal' ? 'selected' : ''}>Formal</option>
-            <option value="custom" ${state.settings.stylePreset === 'custom' ? 'selected' : ''}>Custom</option>
-          </select>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-1">Bahasa</label>
+            <select id="targetLanguage" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
+              <option ${state.settings.targetLanguage === 'English' ? 'selected' : ''}>English</option>
+              <option ${state.settings.targetLanguage === 'Japanese' ? 'selected' : ''}>Japanese</option>
+              <option ${state.settings.targetLanguage === 'Korean' ? 'selected' : ''}>Korean</option>
+              <option ${state.settings.targetLanguage === 'Spanish' ? 'selected' : ''}>Spanish</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-1">Gaya</label>
+            <select id="stylePreset" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-accent">
+              <option value="santuy" ${state.settings.stylePreset === 'santuy' ? 'selected' : ''}>Santuy</option>
+              <option value="gaul" ${state.settings.stylePreset === 'gaul' ? 'selected' : ''}>Gaul</option>
+              <option value="formal" ${state.settings.stylePreset === 'formal' ? 'selected' : ''}>Formal</option>
+              <option value="custom" ${state.settings.stylePreset === 'custom' ? 'selected' : ''}>Custom</option>
+            </select>
+          </div>
         </div>
-      </div>
-      <div id="customStyleContainer" class="${state.settings.stylePreset === 'custom' ? 'block' : 'hidden'}">
-        <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-accent" />
-      </div>
-      <button type="submit" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3 rounded-2xl mt-4">Simpan</button>
-    </form>
+        <div id="customStyleContainer" class="${state.settings.stylePreset === 'custom' ? 'block' : 'hidden'}">
+          <input type="text" id="customStylePrompt" value="${state.settings.customStylePrompt}" placeholder="Misal: Pakai bahasa anak Jaksel..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-accent" />
+        </div>
+        <button type="submit" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-extrabold text-lg py-3 rounded-2xl mt-4">Simpan</button>
+      </form>
+    </div>
   `;
 
   let customContent = `
-    <div class="space-y-6">
+    <div class="animate-slide-in-right space-y-6">
       <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
         <label class="block text-sm font-bold text-slate-800 mb-2">Tampilan Maskot</label>
         <div class="flex gap-2 mb-3">
@@ -355,6 +358,28 @@ function renderOnboarding() {
     </div>
   `;
 
+  // UI MEMORY BANK
+  let memoryContent = `
+    <div class="animate-slide-in-right space-y-4">
+      <p class="text-sm text-slate-600 mb-2">Kasih tahu AI tentang diri lu (hobi, tujuan, hal yang disuka). AI bakal pakai info ini buat bikin contoh kalimat yang personal!</p>
+      
+      <div class="flex gap-2">
+        <input type="text" id="memoryInput" value="${state.memoryInput}" placeholder="Misal: Gw suka anime One Piece..." class="flex-1 px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent" onkeydown="if(event.key==='Enter') window.addMemory()" />
+        <button onclick="window.addMemory()" class="bg-accent text-white font-bold px-4 rounded-xl shadow-md btn-3d border-accent-dark">+</button>
+      </div>
+
+      <div class="space-y-2 max-h-56 overflow-y-auto pr-1" id="memoryList">
+        ${(state.settings.memoryBank || []).length === 0 ? '<p class="text-center text-slate-400 text-sm italic py-4">Belum ada memori tersimpan.</p>' : ''}
+        ${(state.settings.memoryBank || []).map((mem, idx) => `
+          <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-start gap-3 animate-slide-in-right" style="animation-delay: ${idx * 50}ms">
+            <p class="text-sm text-slate-700 font-medium flex-1">${mem}</p>
+            <button onclick="window.deleteMemory(${idx})" class="text-slate-400 hover:text-red-500 bg-white border border-slate-200 rounded-md p-1 transition-colors">&times;</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
   appDiv.innerHTML = `
     <div class="flex-1 flex items-center justify-center p-4 pt-16">
       <div class="animate-slide-up max-w-md w-full bg-white rounded-3xl shadow-premium border border-slate-100 p-6 sm:p-8">
@@ -366,12 +391,15 @@ function renderOnboarding() {
         <!-- TABS -->
         ${state.view === 'settings' ? `
           <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
-            <button id="tabGeneral" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all ${state.settingsTab === 'general' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}">Umum</button>
-            <button id="tabCustom" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all ${state.settingsTab === 'custom' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}">Kustomisasi</button>
+            <button id="tabGeneral" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all ${state.settingsTab === 'general' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}">Umum</button>
+            <button id="tabCustom" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all ${state.settingsTab === 'custom' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}">Kustom</button>
+            <button id="tabMemory" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all ${state.settingsTab === 'memory' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}">Memori</button>
           </div>
         ` : ''}
 
-        ${state.settingsTab === 'general' || state.view === 'onboarding' ? generalContent : customContent}
+        ${state.settingsTab === 'general' || state.view === 'onboarding' ? generalContent : ''}
+        ${state.settingsTab === 'custom' ? customContent : ''}
+        ${state.settingsTab === 'memory' ? memoryContent : ''}
         
         ${state.view === 'settings' ? `
           <div class="text-center mt-6">
@@ -385,6 +413,7 @@ function renderOnboarding() {
   if (state.view === 'settings') {
     document.getElementById('tabGeneral').addEventListener('click', () => { state.settingsTab = 'general'; render(); });
     document.getElementById('tabCustom').addEventListener('click', () => { state.settingsTab = 'custom'; render(); });
+    document.getElementById('tabMemory').addEventListener('click', () => { state.settingsTab = 'memory'; render(); });
     document.getElementById('btnBackHome').addEventListener('click', () => { state.view = 'home'; render(); });
 
     if (state.settingsTab === 'custom') {
@@ -394,6 +423,9 @@ function renderOnboarding() {
         state.view = 'home'; render();
       });
       return; 
+    }
+    if (state.settingsTab === 'memory') {
+      return; // Form ditangani sama fungsi global addMemory
     }
   }
 
@@ -414,6 +446,27 @@ function renderOnboarding() {
     state.view = 'home'; render();
   });
 }
+
+// GLOBAL FUNCTIONS UNTUK MEMORY
+window.addMemory = () => {
+  const input = document.getElementById('memoryInput');
+  if (!input || !input.value.trim()) return;
+  
+  state.settings.memoryBank.push(input.value.trim());
+  saveSettings(state.settings);
+  state.memoryInput = ''; // Reset input
+  
+  // Animasi Mascot Wink!
+  triggerMascot('wink');
+  
+  render(); // Re-render tab memory
+};
+
+window.deleteMemory = (idx) => {
+  state.settings.memoryBank.splice(idx, 1);
+  saveSettings(state.settings);
+  render();
+};
 
 window.applyMascotAsset = (val) => {
   if (val.trim() === '') return;
@@ -495,7 +548,7 @@ function renderHome() {
       <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
         <label class="block text-sm font-bold text-slate-700 mb-2">Mau belajar apa hari ini?</label>
         <input type="text" id="topicInput" value="${state.customTopic}" placeholder="Misal: Makanan, Past Tense..." class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-accent mb-3" />
-        <button id="btnStartCustom" class="w-full btn-3d bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-lg py-3 rounded-xl">
+        <button id="btnStartCustom" class="w-full btn-3d btn-pulse bg-accent hover:bg-indigo-600 border-accent-dark text-white font-black text-lg py-3 rounded-xl">
           MULAI BELAJAR
         </button>
       </div>

@@ -5,18 +5,25 @@ const DEFAULT_SETTINGS = {
   stylePreset: 'santuy',
   customStylePrompt: '',
   level: 'beginner',
-  // FITUR BARU: Custom Assets
   customAssets: {
-    mascot: '🦉', // Default emoji
-    achievements: {} // Key-value buat nyimpen custom icon medali
-  }
+    mascot: '🦉',
+    achievements: {}
+  },
+  // FITUR BARU: Memory Bank
+  memoryBank: []
 };
 
 const loadSettings = () => {
   try {
     const raw = localStorage.getItem('linguaquest.settings');
-    // Pake spread operator buat mastiin kalau customAssets tetep ada meskipun data lama
-    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw), customAssets: { ...DEFAULT_SETTINGS.customAssets, ...(JSON.parse(raw).customAssets || {}) } } : DEFAULT_SETTINGS;
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return { 
+      ...DEFAULT_SETTINGS, 
+      ...parsed, 
+      customAssets: { ...DEFAULT_SETTINGS.customAssets, ...(parsed.customAssets || {}) },
+      memoryBank: parsed.memoryBank || []
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -28,32 +35,20 @@ const saveSettings = (settings) => {
   } catch(e) {}
 };
 
-// --- PROGRESS (XP, STREAK, & MISTAKES & ACHIEVEMENTS) ---
 const DEFAULT_PROGRESS = {
-  xp: 0,
-  streak: 0,
-  lastPlayedDate: '',
-  todayXp: 0,
-  mistakes: [],
-  // FITUR BARU
-  sessionsCompleted: 0,
-  healedMistakes: 0,
-  unlockedAchievements: []
+  xp: 0, streak: 0, lastPlayedDate: '', todayXp: 0, mistakes: [],
+  sessionsCompleted: 0, healedMistakes: 0, unlockedAchievements: []
 };
 
 const loadProgress = () => {
   try {
     const raw = localStorage.getItem('linguaquest.progress');
     return raw ? { ...DEFAULT_PROGRESS, ...JSON.parse(raw) } : DEFAULT_PROGRESS;
-  } catch {
-    return DEFAULT_PROGRESS;
-  }
+  } catch { return DEFAULT_PROGRESS; }
 };
 
 const saveProgress = (progress) => {
-  try {
-    localStorage.setItem('linguaquest.progress', JSON.stringify(progress));
-  } catch(e) {}
+  try { localStorage.setItem('linguaquest.progress', JSON.stringify(progress)); } catch(e) {}
 };
 
 const getTodayString = () => {

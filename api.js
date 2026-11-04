@@ -7,25 +7,29 @@ const getStyleText = (settings) => {
   return 'Gunakan bahasa Indonesia sehari-hari yang santuy dan asik.';
 };
 
-// UPDATE: Sekarang nerima parameter topik dan mistakes
 const generatePrompt = (settings, topic = '', mistakes = []) => {
   let focusText = "";
-  
   if (mistakes && mistakes.length > 0) {
-    // Mode Smart Review
     const listMistakes = mistakes.map((m, i) => `${i+1}. Soal: "${m.question}" (Jawaban benar: "${m.correctAnswer}")`).join('\n');
     focusText = `FOKUS UTAMA: User sebelumnya melakukan kesalahan pada materi/soal berikut:\n${listMistakes}\nBuatkan 5 soal BARU yang menargetkan kelemahan-kelemahan ini agar user bisa memperbaikinya.`;
   } else if (topic && topic.trim() !== '') {
-    // Mode Custom Topik
     focusText = `FOKUS UTAMA: Buatkan soal khusus yang membahas topik "${topic}".`;
   } else {
-    // Mode Bebas / General
     focusText = `FOKUS UTAMA: Buatkan soal latihan acak yang bervariasi.`;
+  }
+
+  // INJEKSI MEMORY BANK
+  let memoryContext = "";
+  if (settings.memoryBank && settings.memoryBank.length > 0) {
+    memoryContext = `\n[INFO TAMBAHAN TENTANG USER (Gunakan ini agar contoh kalimat relevan & personal)]:\n` + 
+      settings.memoryBank.map(m => `- ${m}`).join('\n');
   }
 
   return `Kamu adalah guru bahasa ${settings.targetLanguage} untuk orang Indonesia.
 Buatkan 5 soal latihan untuk level ${settings.level}. 
 ${focusText}
+${memoryContext}
+
 Wajib campur dari 4 tipe ini:
 1. "grammar" (pilihan ganda, isi field "options" array 4 string)
 2. "translate" (terjemahkan kalimat)
@@ -55,12 +59,10 @@ const log = (msg, type = 'info') => {
 
 const fetchWithFallback = async (prompt, apiKey) => {
   let lastError = null;
-  
   for (const model of FALLBACK_MODELS) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         log(`Mencoba model: ${model} (Attempt ${attempt})`, 'accent');
-        
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -77,14 +79,12 @@ const fetchWithFallback = async (prompt, apiKey) => {
         }
         
         const errData = await res.json();
-        
         if (res.status === 503 || res.status === 429) {
           lastError = new Error(`Model ${model} sibuk.`);
-          log(`Error ${res.status} (High Demand). Nunggu ${attempt * 2} detik...`, 'error');
+          log(`Error ${res.status} (High Demand). Nunggu...`, 'error');
           await sleep(attempt * 2000); 
           continue;
         }
-        
         throw new Error(errData.error?.message || "Gagal");
       } catch (err) {
         lastError = err;
@@ -93,9 +93,7 @@ const fetchWithFallback = async (prompt, apiKey) => {
         await sleep(1000);
       }
     }
-    log(`Beralih dari model ${model} karena gagal...`, 'error');
   }
-  
   log(`Semua model gagal.`, 'error');
   throw new Error(`Semua server sibuk: ${lastError?.message}`);
 };
