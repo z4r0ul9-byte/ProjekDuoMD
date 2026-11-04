@@ -18,7 +18,6 @@ const generatePrompt = (settings, topic = '', mistakes = []) => {
     focusText = `FOKUS UTAMA: Buatkan soal latihan acak yang bervariasi.`;
   }
 
-  // INJEKSI MEMORY BANK
   let memoryContext = "";
   if (settings.memoryBank && settings.memoryBank.length > 0) {
     memoryContext = `\n[INFO TAMBAHAN TENTANG USER (Gunakan ini agar contoh kalimat relevan & personal)]:\n` + 
@@ -50,50 +49,93 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
 ]`;
 };
 
-const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 const log = (msg, type = 'info') => {
   if (typeof window.addLog === 'function') window.addLog(msg, type);
 };
 
-const fetchWithFallback = async (prompt, apiKey) => {
-  let lastError = null;
-  for (const model of FALLBACK_MODELS) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        log(`Mencoba model: ${model} (Attempt ${attempt})`, 'accent');
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-          })
-        });
-        
-        if (res.ok) {
-          const json = await res.json();
-          log(`Berhasil dapet soal dari ${model}!`, 'success');
-          return JSON.parse(json.candidates[0].content.parts[0].text);
+// Helper buat bersihin JSON dari format markdown (```json ... ```)
+const cleanJSON = (text) => {
+  let cleaned = text.trim();
+  if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json/, '');
+  else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```/, '');
+  if (cleaned.endsWith('```')) cleaned = cleaned.replace(/```$/, '');
+  return JSON.parse(cleaned.trim());
+};
+
+const fetchAI = async (prompt, settings) => {
+  const { apiKey, provider, modelName, customBaseUrl } = settings;
+
+  if (provider === 'gemini') {
+    // GEMINI FALLBACK LOGIC
+    const FALLBACK_MODELS = [modelName || 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    let lastError = null;
+    for (const model of FALLBACK_MODELS) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          log(`[Gemini] Mencoba ${model} (Attempt ${attempt})`, 'accent');
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          });
+          if (res.ok) {
+            const json = await res.json();
+            log(`[Gemini] Sukses di ${model}`, 'success');
+            return cleanJSON(json.candidates[0].content.parts[0].text);
+          }
+          const errData = await res.json();
+          if (res.status === 503 || res.status === 429) {
+            lastError = new Error(`Model ${model} sibuk.`);
+            await new Promise(r => setTimeout(r, attempt * 2000)); 
+            continue;
+          }
+          throw new Error(errData.error?.message || "Gagal");
+        } catch (err) {
+          lastError = err;
+          if (attempt === 2) break;
+          await new Promise(r => setTimeout(r, 1000));
         }
-        
-        const errData = await res.json();
-        if (res.status === 503 || res.status === 429) {
-          lastError = new Error(`Model ${model} sibuk.`);
-          log(`Error ${res.status} (High Demand). Nunggu...`, 'error');
-          await sleep(attempt * 2000); 
-          continue;
-        }
-        throw new Error(errData.error?.message || "Gagal");
-      } catch (err) {
-        lastError = err;
-        log(`Gagal di ${model}: ${err.message}`, 'error');
-        if (attempt === 2) break;
-        await sleep(1000);
       }
     }
+    throw new Error(`Semua model Gemini gagal: ${lastError?.message}`);
+  } 
+  else {
+    // OPENAI COMPATIBLE (Ollama, Groq, OpenAI, OpenRouter, dll)
+    try {
+      log(`[Custom API] Mencoba ${modelName}...`, 'accent');
+      const url = `${customBaseUrl.replace(/\/$/, '')}/chat/completions`;
+      
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey || 'ollama'}` // Ollama butuh string random
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: "user", content: prompt }],
+          // Paksa JSON kalau API-nya support (OpenAI/Groq biasanya support)
+          response_format: { type: "json_object" } 
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `HTTP Error ${res.status}`);
+      }
+
+      const json = await res.json();
+      log(`[Custom API] Sukses!`, 'success');
+      
+      // Kadang API lokal ngasih response beda dikit
+      const rawText = json.choices[0].message.content;
+      return cleanJSON(rawText);
+    } catch (err) {
+      log(`[Custom API] Error: ${err.message}`, 'error');
+      throw new Error(`Custom API Error: ${err.message}`);
+    }
   }
-  log(`Semua model gagal.`, 'error');
-  throw new Error(`Semua server sibuk: ${lastError?.message}`);
 };
