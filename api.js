@@ -7,9 +7,26 @@ const getStyleText = (settings) => {
   return 'Gunakan bahasa Indonesia sehari-hari yang santuy dan asik.';
 };
 
-const generatePrompt = (settings) => {
+// UPDATE: Sekarang nerima parameter topik dan mistakes
+const generatePrompt = (settings, topic = '', mistakes = []) => {
+  let focusText = "";
+  
+  if (mistakes && mistakes.length > 0) {
+    // Mode Smart Review
+    const listMistakes = mistakes.map((m, i) => `${i+1}. Soal: "${m.question}" (Jawaban benar: "${m.correctAnswer}")`).join('\n');
+    focusText = `FOKUS UTAMA: User sebelumnya melakukan kesalahan pada materi/soal berikut:\n${listMistakes}\nBuatkan 5 soal BARU yang menargetkan kelemahan-kelemahan ini agar user bisa memperbaikinya.`;
+  } else if (topic && topic.trim() !== '') {
+    // Mode Custom Topik
+    focusText = `FOKUS UTAMA: Buatkan soal khusus yang membahas topik "${topic}".`;
+  } else {
+    // Mode Bebas / General
+    focusText = `FOKUS UTAMA: Buatkan soal latihan acak yang bervariasi.`;
+  }
+
   return `Kamu adalah guru bahasa ${settings.targetLanguage} untuk orang Indonesia.
-Buatkan 5 soal latihan untuk level ${settings.level}. Wajib campur dari 4 tipe ini:
+Buatkan 5 soal latihan untuk level ${settings.level}. 
+${focusText}
+Wajib campur dari 4 tipe ini:
 1. "grammar" (pilihan ganda, isi field "options" array 4 string)
 2. "translate" (terjemahkan kalimat)
 3. "fill-blank" (isi titik-titik, soal ada di field "question")
@@ -32,7 +49,6 @@ Output HARUS berupa JSON array murni tanpa markdown, dengan format persis sepert
 const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper buat ngirim log ke UI
 const log = (msg, type = 'info') => {
   if (typeof window.addLog === 'function') window.addLog(msg, type);
 };
