@@ -1,9 +1,9 @@
 // storage.js
 const DEFAULT_SETTINGS = {
   apiKey: '',
-  provider: 'gemini', // 'gemini' | 'custom'
-  modelName: 'gemini-3.6-flash', // Default model
-  customBaseUrl: 'https://api.openai.com/v1', // Base URL buat custom
+  provider: 'gemini',
+  modelName: 'gemini-3.6-flash',
+  customBaseUrl: 'https://api.openai.com/v1',
   targetLanguage: 'English',
   stylePreset: 'santuy',
   customStylePrompt: '',
